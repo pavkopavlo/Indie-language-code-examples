@@ -1,0 +1,62 @@
+# For education purposes 
+# Ported to Indie from https://www.tradingview.com/script/HFGx4ote-Indicator-Weis-Wave-Volume-LazyBear/
+# The author of the original indicator is @LazyBear
+
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.  
+# If a copy of the MPL was not distributed with this file, you can obtain one at  
+# <https://mozilla.org/MPL/2.0/>.
+
+# indie:lang_version = 4
+import math
+from indie import indicator, SeriesF, MutSeriesF, param, plot, color, plot_style, Plot
+
+
+def rising(src: SeriesF, length: int) -> bool:
+    for i in range(length):
+        if not (src[i] > src[i + 1]):
+            return False
+    return True
+
+
+def falling(src: SeriesF, length: int) -> bool:
+    for i in range(length):
+        if not (src[i] < src[i + 1]):
+            return False
+    return True
+
+
+def nan_to_zero(val: float) -> float:
+    return 0 if math.isnan(val) else val
+
+
+@indicator('Weis Wave Volume')
+@param.int('trend_detection_length', default=2, min=1, title='Trend detection length')
+@param.bool('show_distribution_below_zero', default=False, title='Show Distribution Below Zero')
+@plot(style=plot_style.COLUMNS)
+def Main(self, trend_detection_length, show_distribution_below_zero):
+    mov = 0
+    if self.close[0] > self.close[1]:
+        mov = 1
+    elif self.close[0] < self.close[1]:
+        mov = -1
+
+    is_trending = rising(self.close, trend_detection_length) or falling(self.close, trend_detection_length)
+
+    wave = MutSeriesF.new(0)
+    if mov != nan_to_zero(wave[1]) and is_trending:
+        wave[0] = mov
+    else:
+        wave[0] = nan_to_zero(wave[1])
+
+    vol = MutSeriesF.new(0)
+    if wave[0] == wave[1]:
+        vol[0] = nan_to_zero(vol[1]) + self.volume[0]
+    else:
+        vol[0] = self.volume[0]
+
+    col = color.GREEN if wave[0] == 1 else color.RED
+    res = vol[0]
+    if show_distribution_below_zero:
+        res = vol[0] * wave[0]
+
+    return Plot(res, color=col)

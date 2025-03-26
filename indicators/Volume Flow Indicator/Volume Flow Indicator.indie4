@@ -1,0 +1,54 @@
+#Education Purposes
+# Ported to Indie from https://www.tradingview.com/script/MhlDpfdS-Volume-Flow-Indicator-LazyBear/ created by @LazyBear
+# More info about the algorithm could be found here: https://precisiontradingsystems.com/volume-flow.htm
+
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.  
+# If a copy of the MPL was not distributed with this file, you can obtain one at  
+# <https://mozilla.org/MPL/2.0/>.
+
+# indie:lang_version = 4
+import math
+from indie import indicator, param, MutSeriesF, level, line_style, color, plot, plot_style, SeriesF
+from indie.algorithms import StdDev, Sma, Sum, Ema
+
+
+@indicator('VFI')  # Volume Flow Indicator
+@param.int('length', default=130, min=1, title='VFI length')
+@param.float('coef', default=0.2, title='Cutoff coef')
+@param.float('vcoef', default=2.5, title='Max. vol. cutoff')
+@param.int('signal_length', default=5, min=1, title='Signal length')
+@param.bool('smooth_vfi', default=False, title='Smooth VFI')
+@param.bool('show_histo', default=True, title='Show histogram')
+@level(0, line_color=color.GRAY, line_style=line_style.DASHED)
+@plot(color=color.GRAY(0.5), line_width=3, style=plot_style.HISTOGRAM)
+@plot(color=color.RED, title='EMA of VFI')
+@plot(color=color.GREEN, line_width=2, title='VFI')
+def Main(self, length, coef, vcoef, signal_length, smooth_vfi, show_histo):
+    typical = self.hlc3
+
+    inter = math.log(typical[0]) - math.log(typical[1])
+    vinter = StdDev.new(MutSeriesF.new(inter), 30)[0]
+    cutoff = coef * vinter * self.close[0]
+    vave = Sma.new(self.volume, length)[1]
+    vmax = vave * vcoef
+    vc = min(self.volume[0], vmax)
+    mf = typical[0] - typical[1]
+
+    vcp = MutSeriesF.new(0)
+    if mf > cutoff:
+        vcp[0] = vc
+    elif mf < -cutoff:
+        vcp[0] = -vc
+
+    vfi: SeriesF = MutSeriesF.new(Sum.new(vcp, length)[0] / vave)
+    if smooth_vfi:
+        vfi = Sma.new(vfi, 3)
+
+    vfima = Ema.new(vfi, signal_length)
+    d = vfi[0] - vfima[0]
+
+    return (
+        d if show_histo else math.nan,
+        vfima[0],
+        vfi[0],
+    )

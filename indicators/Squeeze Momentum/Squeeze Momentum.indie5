@@ -1,0 +1,67 @@
+#Education Purposes
+# Ported to Indie from https://www.tradingview.com/script/nqQ1DT5a-Squeeze-Momentum-Indicator-LazyBear/ created by @LazyBear
+# More info about the algorithm could be found in the book "Mastering The Trade" by John F Carter
+
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.  
+# If a copy of the MPL was not distributed with this file, you can obtain one at  
+# <https://mozilla.org/MPL/2.0/>.
+
+# indie:lang_version = 5
+from math import isnan
+from indie import indicator, SeriesF, MutSeriesF, plot, param, color, line_style
+from indie.algorithms import Sma, Tr, Bb, Highest, Lowest, LinReg
+
+
+def mean(s1: SeriesF, s2: SeriesF, s3: SeriesF) -> float:
+    return s1[0] / 4 + s2[0] / 4 + s3[0] / 2
+
+
+def nan_to_zero(val: float) -> float:
+    return 0 if isnan(val) else val
+
+
+@indicator('Squeeze Momentum')
+@param.int('length', default=20, min=1, title='BB Length')
+@param.float('mult', default=1.5, title='BB MultFactor')
+@param.int('length_kc', default=20, min=1, title='KC Length')
+@param.float('mult_kc', default=1.5, title='KC MultFactor')
+@param.bool('use_true_range', default=True, title='Use TrueRange (KC)')
+@plot.histogram(line_width=4, id='#plot_0')
+@plot.line(line_style=line_style.SOLID, line_width=4, id='#plot_1')  # TODO: use markers
+def Main(self, length, mult, length_kc, mult_kc, use_true_range):
+    (bb_lower, _, bb_upper) = Bb.new(self.close, length, mult)
+
+    ma = Sma.new(self.close, length_kc)[0]
+    range_s = Tr.new() if use_true_range else MutSeriesF.new(self.high[0] - self.low[0])
+    range_ma = Sma.new(range_s, length_kc)[0]
+    kc_upper = ma + range_ma * mult_kc
+    kc_lower = ma - range_ma * mult_kc
+
+    sqz_on  = (bb_lower[0] > kc_lower) and (bb_upper[0] < kc_upper)
+    sqz_off = (bb_lower[0] < kc_lower) and (bb_upper[0] > kc_upper)
+    no_sqz  = (sqz_on == False) and (sqz_off == False)
+
+    val = LinReg.new(MutSeriesF.new(self.close[0] - mean(Highest.new(self.high, length_kc),
+                                                         Lowest.new(self.low, length_kc),
+                                                         Sma.new(self.close, length_kc))),
+                     length_kc)
+
+    bcolor = color.BLACK  # just random color to initialize variable
+    if val[0] > 0:
+        if val[0] > nan_to_zero(val[1]):
+            bcolor = color.LIME
+        else:
+            bcolor = color.GREEN
+    else:
+        if val[0] < nan_to_zero(val[1]):
+            bcolor = color.RED
+        else:
+            bcolor = color.MAROON
+
+    scolor = color.GRAY
+    if no_sqz:
+        scolor = color.OLIVE
+    elif sqz_on:
+        scolor = color.NAVY
+
+    return plot.Histogram(val[0], color=bcolor), plot.Line(0, color=scolor)

@@ -1,0 +1,54 @@
+#Education Purposes
+# Ported to Indie from https://www.tradingview.com/script/OQs2lVvr-Ultimate-Moving-Average-Multi-TimeFrame-7-MA-Types/ created by @ChrisMoody
+
+# This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.  
+# If a copy of the MPL was not distributed with this file, you can obtain one at  
+# <https://mozilla.org/MPL/2.0/>.
+
+# indie:lang_version = 5
+import math
+from indie import indicator, param, sec_context, MainContext, param_ref, color, plot, MutSeriesF
+from indie.algorithms import Wma, Ema, Ma
+
+
+@sec_context
+@param_ref('len')
+@param_ref('ma_type')
+def SecMain(self, len, ma_type):
+    src = self.close
+    if ma_type == 'HullMA':
+        wma_l2 = Wma.new(src, len // 2)[0]
+        wma_l = Wma.new(src, len)[0]
+        return Wma.new(MutSeriesF.new(2 * wma_l2 - wma_l), round(math.sqrt(len)))[0]
+    elif ma_type == 'TEMA':
+        ema1 = Ema.new(src, len)
+        ema2 = Ema.new(ema1, len)
+        ema3 = Ema.new(ema2, len)
+        return 3 * (ema1[0] - ema2[0]) + ema3[0]
+    return Ma.new(src, len, ma_type)[0]
+
+
+@indicator('Ultimate MA - MultiTF', overlay_main_pane=True)
+@param.bool('use_current_tf', default=True, title='Use Current Chart Time Frame?')
+@param.time_frame('tf_custom', default='1D', title='Use Different Timeframe? Uncheck Box Above')
+@param.int('len', default=20, min=1, title='Moving Average Length - LookBack Period')
+@param.str('ma_type', default='SMA', options=['SMA', 'EMA', 'WMA', 'HullMA', 'VWMA', 'RMA', 'TEMA'], title='MA algorithm')
+@param.bool('cc', default=True, title='Change Color Based On Direction?')
+@param.int('smoothe', default=2, min=1, max=10, title='Color Smoothing (1 = No Smoothing)')
+@plot.line(line_width=4, title='Multi-Timeframe Moving Avg', id='#plot_0')
+class Main(MainContext):
+    def __init__(self, use_current_tf, tf_custom):
+        tf_choosed = self.time_frame if use_current_tf else tf_custom
+        self._out = self.calc_on(SecMain, time_frame=tf_choosed, lookahead=True)
+
+    def calc(self, cc, smoothe):
+        ma_up = self._out[0] >= self._out[smoothe]
+        ma_down = self._out[0] < self._out[smoothe]
+
+        col = color.AQUA
+        if cc and ma_up:
+            col = color.LIME
+        elif cc and ma_down:
+            col = color.RED
+
+        return plot.Line(self._out[0], color=col)

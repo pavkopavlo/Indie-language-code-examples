@@ -1,0 +1,18 @@
+//education purpose
+//@version=3
+// Author: Sheldon Patnett
+// Discord: Sheldon#7775  / https://discord.gg/t2JTnAa
+study("Elder's Force Index Function (with source)")
+
+// User-defined input for EMA length
+length = input(defval=13, title="Length")
+
+// Function to calculate Elder's Force Index
+pine_efi(len) =>
+    // Calculate the raw Force Index value
+    src = ((close - close[1]) * volume)
+    // Apply EMA to smooth the Force Index
+    efi = ema(src, len)
+
+// Plot the Elder's Force Index with white color
+plot(pine_efi(length), color=#ffffff)

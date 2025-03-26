@@ -1,0 +1,18 @@
+#education purpose
+# indie:lang_version = 4
+from indie import indicator, plot, color, param, MutSeriesF, Plot
+from indie.algorithms import Ema
+
+@indicator("Elder's Force Index (FI)", overlay_main_pane=False)
+@param.int('length', default=13, min=1, title='EMA Length')
+def Main(self, length):
+    # Create a mutable time series for the Force Index
+    fi_series = MutSeriesF.new((self.close[0] - self.close[1]) * self.volume[0])
+    
+    # Apply exponential smoothing
+    smoothed_fi = Ema.new(fi_series, length)[0]
+
+    # Determine the color of the indicator line
+    fi_color = color.GREEN if smoothed_fi > 0 else color.RED
+
+    return Plot(smoothed_fi, color=fi_color)

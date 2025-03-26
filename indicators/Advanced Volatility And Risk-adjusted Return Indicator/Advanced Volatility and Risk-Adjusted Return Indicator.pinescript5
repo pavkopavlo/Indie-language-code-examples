@@ -1,0 +1,32 @@
+//education purpose
+//@version=5
+indicator("Advanced Volatility and Risk-Adjusted Return Indicator", overlay=true)
+
+// Input parameters
+stddev_length = input.int(20, title="Standard Deviation Length", minval=1)
+sma_length = input.int(20, title="SMA Length for Sharpe Ratio", minval=1)
+risk_free_rate = input.float(0.01, title="Risk-Free Rate")
+arch_lag = input.int(1, title="ARCH Lag", minval=1)
+
+// Calculate Standard Deviation
+stddev = ta.stdev(close, stddev_length)
+
+// Calculate Sharpe Ratio
+returns = array.new_float(sma_length)
+for i = 1 to sma_length
+    array.push(returns, (close[i - 1] - close[i]) / close[i])
+avg_returns = ta.sma(array.sum(returns), sma_length)
+excess_returns = avg_returns - risk_free_rate
+sharpe_ratio = excess_returns / stddev
+
+// Calculate ARCH Model for time-varying volatility
+mean_return = ta.sma(close, sma_length)
+arch_volatility = 0.0
+for i = 0 to arch_lag - 1
+    arch_volatility := arch_volatility + math.pow(close[i] - mean_r
+eturn, 2)arch_volatility := math.sqrt(arch_volatility / arch_lag)
+
+// Plot the values
+plot(stddev, color=color.yellow, title="Standard Deviation")
+plot(sharpe_ratio, color=color.blue, title="Sharpe Ratio")
+plot(arch_volatility, color=color.red, title="ARCH Volatility")

@@ -1,0 +1,38 @@
+#education purpose
+# indie:lang_version = 4
+import math
+from indie import indicator, param, plot, color, Plot, SeriesF, MutSeriesF
+from indie.algorithms import StdDev, Sma, Ema
+
+@indicator('Advanced Volatility and Risk-Adjusted Return Indicator', overlay_main_pane=True)
+@param.int('stddev_length', default=20, min=1, title='Standard Deviation Length')
+@param.int('sma_length', default=20, min=1, title='SMA Length for Sharpe Ratio')
+@param.float('risk_free_rate', default=0.01, title='Risk-Free Rate')
+@param.int('arch_lag', default=1, min=1, title='ARCH Lag')
+@plot('Standard Deviation', color=color.YELLOW)
+@plot('Sharpe Ratio', color=color.BLUE)
+@plot('ARCH Volatility', color=color.RED)
+def Main(self, stddev_length, sma_length, risk_free_rate, arch_lag):
+    # Calculate Standard Deviation
+    stddev = StdDev.new(self.close, stddev_length)[0]
+
+    # Calculate Sharpe Ratio
+    returns = MutSeriesF.new(0)
+    for i in range(1, sma_length + 1):
+        returns[0] += (self.close[i - 1] - self.close[i]) / self.close[i]
+    avg_returns = returns[0] / sma_length
+    excess_returns = avg_returns - risk_free_rate
+    sharpe_ratio = excess_returns / stddev if stddev != 0 else 0
+
+    # Calculate ARCH Model for time-varying volatility
+    arch_volatility = MutSeriesF.new(0)
+    mean_return = Sma.new(self.close, sma_length)[0]
+    for i in range(arch_lag):
+        arch_volatility[0] += (self.close[i] - mean_return) ** 2
+    arch_volatility[0] = math.sqrt(arch_volatility[0] / arch_lag)
+
+    return (
+        Plot(stddev),
+        Plot(sharpe_ratio),
+        Plot(arch_volatility[0])
+    )

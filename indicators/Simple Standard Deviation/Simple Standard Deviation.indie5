@@ -1,0 +1,10 @@
+#education purpose
+# indie:lang_version = 5
+from indie import indicator, plot, color
+from indie.algorithms import StdDev
+
+@indicator('Standard Deviation', overlay_main_pane=True)
+@plot.line('stddev', color=color.YELLOW)
+def Main(self):
+    stddev = StdDev.new(self.close, 20)
+    return plot.Line(stddev[0])

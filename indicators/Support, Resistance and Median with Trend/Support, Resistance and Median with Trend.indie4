@@ -1,0 +1,65 @@
+#education purpose
+#!!atention, code can have errors, check double!
+#Error: [internal] functions can only be declared in the global scope or inside classes as methods
+# indie:lang_version = 4
+from indie import indicator, param, plot, color, Plot
+from indie.algorithms import Highest, Lowest, MutSeriesF
+
+@indicator("Support, Resistance and Median with Trend", overlay_main_pane=True)
+@param.int("length", default=22, title="Historical Length", options=[22, 44, 66])
+def Main(self, length):
+    # Calculate support and resistance levels
+    highest_high = Highest.new(self.high, length)[0]
+    lowest_low = Lowest.new(self.low, length)[0]
+    
+    # Adjust levels
+    resistance_level = highest_high
+    support_level = lowest_low
+    
+    # Calculate median
+    median_level = (resistance_level + support_level) / 2
+    
+    # Trend detection
+    is_uptrend = self.close[0] > median_level and self.close[1] > median_level
+    is_downtrend = self.close[0] < median_level and self.close[1] < median_level
+    
+    # Plot levels
+    @plot("Resistance", color=color.RED, width=2)
+    def plot_resistance():
+        return resistance_level
+    
+    @plot("Support", color=color.GREEN, width=2)
+    def plot_support():
+        return support_level
+    
+    @plot("Median", color=color.WHITE, width=1)
+    def plot_median():
+        return median_level
+    
+    # Trend indication
+    trend_color = color.GRAY
+    trend_text = "Neutral"
+    if is_uptrend:
+        trend_color = color.GREEN
+        trend_text = "Uptrend"
+    elif is_downtrend:
+        trend_color = color.RED
+        trend_text = "Downtrend"
+    
+    # Draw text box in top right corner
+    self.draw_text("trend_text", trend_text, x=self.bar_index[0], y=highest_high, color=trend_color)
+    
+    # Projection for future periods
+    projection_periods = 8
+    resistance_proj = MutSeriesF.new(resistance_level)
+    support_proj = MutSeriesF.new(support_level)
+    median_proj = MutSeriesF.new(median_level)
+    
+    for i in range(1, projection_periods + 1):
+        resistance_proj[0] = resistance_level
+        support_proj[0] = support_level
+        median_proj[0] = median_level
+        
+        self.draw_line("res_line_" + str(i), self.bar_index[0], resistance_proj[0], self.bar_index[0] + i, resistance_proj[0], color=color.RED, width=2)
+        self.draw_line("sup_line_" + str(i), self.bar_index[0], support_proj[0], self.bar_index[0] + i, support_proj[0], color=color.GREEN, width=2)
+        self.draw_line("med_line_" + str(i), self.bar_index[0], median_proj[0], self.bar_index[0] + i, median_proj[0], color=color.WHITE, width=1)

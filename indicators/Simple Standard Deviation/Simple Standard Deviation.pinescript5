@@ -1,0 +1,12 @@
+//education purpose
+//@version=5
+indicator("Standard Deviation", overlay=true)
+
+// Define length
+length = 20
+
+// Calculate Standard Deviation
+stddev = ta.stdev(close, length)
+
+// Plot Standard Deviation
+plot(stddev, color=color.yellow, title="StdDev")

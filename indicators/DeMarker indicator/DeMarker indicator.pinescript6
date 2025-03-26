@@ -1,0 +1,20 @@
+//education purpose
+//@version=6
+indicator("DeMarker", overlay=false)
+
+// Input for the period
+period = 14
+
+// Compute differences
+high_diff = high > high[1] ? high - high[1] : 0
+low_diff = low < low[1] ? low[1] - low : 0
+
+// Compute the sum over the period using manual summation (since `ta.sum()` doesn't exist)
+sum_high = math.sum(high_diff, period)
+sum_low = math.sum(low_diff, period)
+
+// Calculate DeMarker
+dem = (sum_high + sum_low != 0) ? sum_high / (sum_high + sum_low) : 0
+
+// Plot the DeMarker indicator
+plot(dem, color=color.blue, title="DeMarker")

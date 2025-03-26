@@ -1,0 +1,28 @@
+#education purpose
+# indie:lang_version = 5
+from indie import indicator, plot, color, MutSeriesF
+from indie.algorithms import Sum
+
+@indicator('DeMarker')
+@plot.line(color=color.BLUE, id='#plot_0')
+def Main(self):
+    period = 14  # DeMarker's standard period
+
+    # Create a series to store the differences
+    high_diff = MutSeriesF.new(0)
+    low_diff = MutSeriesF.new(0)
+
+    # Fill the series with values
+    if self.high[0] > self.high[1]:
+        high_diff[0] = self.high[0] - self.high[1]
+    if self.low[0] < self.low[1]:
+        low_diff[0] = self.low[1] - self.low[0]
+
+    # Use Sum to sum over the period
+    sum_high = Sum.new(high_diff, period)[0]
+    sum_low = Sum.new(low_diff, period)[0]
+
+    # Calculate DeMarker
+    dem = sum_high / (sum_high + sum_low) if (sum_high + sum_low) != 0 else 0
+
+    return plot.Line(dem)

@@ -1,0 +1,28 @@
+#education purpose
+# indie:lang_version = 5
+from indie import indicator, param, plot, color, MainContext
+from indie.algorithms import Highest, Lowest
+
+@indicator("Support, Resistance and Median with Trend", overlay_main_pane=True)
+@param.int("length", default=22, min=1, title="Historical Length")
+@plot.line("resistance", color=color.RED, line_width=2, title="Resistance")
+@plot.line("support", color=color.GREEN, line_width=2, title="Support")
+@plot.line("median", color=color.WHITE, line_width=1, title="Median")
+class Main(MainContext):
+    def calc(self, length):
+        # Calculate support and resistance levels
+        highest_high = Highest.new(self.high, length)[0]
+        lowest_low = Lowest.new(self.low, length)[0]
+        
+        # Adjust levels
+        resistance_level = highest_high
+        support_level = lowest_low
+        
+        # Calculate median
+        median_level = (resistance_level + support_level) / 2
+        
+        # Trend detection
+        is_uptrend = self.close[0] > median_level and self.close[1] > median_level
+        is_downtrend = self.close[0] < median_level and self.close[1] < median_level
+        
+        return resistance_level, support_level, median_level

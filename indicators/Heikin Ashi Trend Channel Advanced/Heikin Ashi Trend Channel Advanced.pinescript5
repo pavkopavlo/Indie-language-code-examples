@@ -1,0 +1,56 @@
+//@version=5
+indicator("Heikin Ashi Trend Channel Advanced", overlay=true)
+
+// Input parameters
+ema_length = input.int(10, "EMA Length for Smoothing", minval=1)
+ema_length2 = input.int(20, "Secondary EMA Length", minval=1)
+atr_multiplier = input.float(2.0, "ATR Multiplier", minval=0.5, maxval=5.0)
+use_bb_smoothing = input.bool(false, "Use Bollinger Band Smoothing?")
+bb_length = input.int(20, "Bollinger Band Length", minval=1)
+use_heikin_ashi = input.bool(true, "Use Heikin Ashi Close?")
+
+// Compute Heikin Ashi or Standard Close
+price_close = use_heikin_ashi ? (open + high + low + close) / 4 : close
+
+// Apply smoothing
+smoothed_price = ta.ema(price_close, ema_length)
+smoothed_price2 = ta.ema(smoothed_price, ema_length2)  // Secondary EMA for extra smoothing
+
+// ATR for channel width
+atr_value = ta.atr(ema_length)
+
+// Adjust ATR multiplier dynamically based on price level
+price_ratio = price_close != 0 ? close / price_close : 1
+adaptive_multiplier = atr_multiplier * price_ratio
+
+// Compute middle band - default EMA-based or Bollinger Band
+var float middle_band = 0.0
+if use_bb_smoothing
+    middle_band := ta.sma(smoothed_price2, bb_length)
+else
+    middle_band := smoothed_price2
+
+// Compute channel bands
+upper_band = middle_band + (adaptive_multiplier * atr_value)
+lower_band = middle_band - (adaptive_multiplier * atr_value)
+
+// Trend-based middle band color
+middle_band_color = middle_band > smoothed_price2[1] ? color.green : color.red
+
+// Breakout signal
+var float breakout_signal = na
+if close > upper_band
+    breakout_signal := upper_band
+else if close < lower_band
+    breakout_signal := lower_band
+else
+    breakout_signal := na
+
+// Plotting
+upper_plot = plot(upper_band, "Upper Band", color=color.blue)
+plot(middle_band, "Middle Band", color=middle_band_color)
+lower_plot = plot(lower_band, "Lower Band", color=color.blue)
+plot(breakout_signal, "Breakout Signal", color=color.yellow)
+
+// Fill between upper and lower bands
+fill(upper_plot, lower_plot, color=color.new(color.gray, 90), title="Trend Channel")

@@ -1,0 +1,67 @@
+#education purpose
+#created by @insurgent https://takeprofit.com/@insurgent
+# indie:lang_version = 4
+import math
+from indie import indicator, param, plot, color, Plot, MutSeriesF, Fill, fill, Optional
+from indie.algorithms import Ema, Atr, Bb
+
+@indicator('Heikin Ashi Trend Channel Advanced', overlay_main_pane=True)
+@param.int('ema_length', default=10, min=1, title='EMA Length for Smoothing')
+@param.int('ema_length2', default=20, min=1, title='Secondary EMA Length')
+@param.float('atr_multiplier', default=2.0, min=0.5, max=5.0, title='ATR Multiplier')
+@param.bool('use_bb_smoothing', default=False, title='Use Bollinger Band Smoothing?')
+@param.int('bb_length', default=20, min=1, title='Bollinger Band Length')
+@param.bool('use_heikin_ashi', default=True, title='Use Heikin Ashi Close?')
+
+@plot('upper_band', color=color.BLUE, title='Upper Band')
+@plot('middle_band', title='Middle Band')  # No `dynamic_color`
+@plot('lower_band', color=color.BLUE, title='Lower Band')
+@plot('breakout_signal', color=color.YELLOW, title='Breakout Signal')
+
+@fill('lower_band', 'upper_band', color=color.GRAY(0.1), title='Trend Channel')
+
+def Main(self, ema_length, ema_length2, atr_multiplier, use_bb_smoothing, bb_length, use_heikin_ashi):
+    # Compute Heikin Ashi or Standard Close
+    price_close = (self.open[0] + self.high[0] + self.low[0] + self.close[0]) / 4 if use_heikin_ashi else self.close[0]
+    price_series = MutSeriesF.new(price_close)
+
+    # Apply smoothing
+    smoothed_price = Ema.new(price_series, ema_length)
+    smoothed_price2 = Ema.new(smoothed_price, ema_length2)  # Secondary EMA for extra smoothing
+
+    # ATR for channel width
+    atr_value = Atr.new(ema_length)[0]  # Corrected ATR usage
+
+    # Adjust ATR multiplier dynamically based on price level
+    price_ratio = self.close[0] / price_close if price_close != 0 else 1
+    adaptive_multiplier = atr_multiplier * price_ratio
+
+    # Compute default middle band (EMA-based)
+    middle_band = smoothed_price2[0]
+
+    # Override with Bollinger Band smoothing if enabled
+    if use_bb_smoothing:
+        bb_middle, _, _ = Bb.new(smoothed_price2, bb_length, 2.0)
+        middle_band = bb_middle[0]
+
+    # Compute channel bands
+    upper_band = middle_band + (adaptive_multiplier * atr_value)
+    lower_band = middle_band - (adaptive_multiplier * atr_value)
+
+    # Trend-based middle band color
+    middle_band_color = color.GREEN if middle_band > smoothed_price2[1] else color.RED
+
+    # Breakout signal (Correct Optional[float] usage)
+    breakout_signal: Optional[float] = None
+    if self.close[0] > upper_band:
+        breakout_signal = upper_band  # Assign float directly
+    elif self.close[0] < lower_band:
+        breakout_signal = lower_band
+
+    return (
+        Plot(upper_band),
+        Plot(middle_band, color=middle_band_color),  # Dynamic color inside function
+        Plot(lower_band),
+        Plot(breakout_signal.value_or(math.nan)),  # Safe extraction using `.value_or(math.nan)`
+        Fill()
+    )

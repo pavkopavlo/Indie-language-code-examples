@@ -1,0 +1,60 @@
+//education purpose
+//@version=5
+indicator("Support, Resistance and Median with Trend", overlay=true)
+
+// Parameters
+length = input.int(22, title="Historical Length", options=[22, 44, 66])
+projectionPeriods = 8 // Number of periods for projection
+
+// Calculate support and resistance levels
+highestHigh = ta.highest(high, length)
+lowestLow = ta.lowest(low, length)
+
+// Adjust levels based on sensitivity
+resistanceLevel = highestHigh * 1
+supportLevel = lowestLow * 1
+
+// Calculate median
+medianLevel = (resistanceLevel + supportLevel) / 2
+
+// Trend detection
+isUptrend = close > medianLevel and close[1] > medianLevel[1]
+isDowntrend = close < medianLevel and close[1] < medianLevel[1]
+
+// Plot support, resistance, and median levels for current periods
+plot(resistanceLevel, title="Resistance", color=color.red, linewidth=2, style=plot.style_line)
+plot(supportLevel, title="Support", color=color.green, linewidth=2, style=plot.style_line)
+plot(medianLevel, title="Median", color=color.white, linewidth=1, style=plot.style_line)
+
+// Trend box in top right corner
+var table trendTable = table.new(position.top_right, 1, 1)
+table.cell(trendTable, 0, 0, 
+           isUptrend ? "Uptrend" : 
+           isDowntrend ? "Downtrend" : "Neutral", 
+           bgcolor=isUptrend ? color.green : 
+                   isDowntrend ? color.red : color.gray)
+
+// Create arrays to store projected values
+var float[] resistanceArray = array.new_float(projectionPeriods, resistanceLevel)
+var float[] supportArray = array.new_float(projectionPeriods, supportLevel)
+var float[] medianArray = array.new_float(projectionPeriods, medianLevel)
+
+// Update arrays with new values
+for i = 0 to projectionPeriods - 1
+    array.set(resistanceArray, i, resistanceLevel)
+    array.set(supportArray, i, supportLevel)
+    array.set(medianArray, i, medianLevel)
+
+// Plot projections with lines to extend levels
+for i = 0 to projectionPeriods - 1
+    offset = i + 1
+    if bar_index >= length - 1
+        line.new(x1=bar_index, y1=array.get(resistanceArray, i),
+                 x2=bar_index + offset, y2=array.get(resistanceArray, i),
+                 color=color.red, width=2)
+        line.new(x1=bar_index, y1=array.get(supportArray, i),
+                 x2=bar_index + offset, y2=array.get(supportArray, i),
+                 color=color.green, width=2)
+        line.new(x1=bar_index, y1=array.get(medianArray, i),
+                 x2=bar_index + offset, y2=array.get(medianArray, i),
+                 color=color.white, width=1)

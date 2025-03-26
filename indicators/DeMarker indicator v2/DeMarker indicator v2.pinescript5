@@ -1,0 +1,23 @@
+//education purpose
+//@version=5
+indicator("DeMarker", overlay=false)
+
+per = input(13, title="Period")
+
+demax = ta.highest(high, 2) - high[1] > 0 ? high - high[1] : 0
+demin = ta.lowest(low, 2) - low[1] < 0 ? low[1] - low : 0
+
+demax_av = ta.sma(demax, per)
+demin_av = ta.sma(demin, per)
+
+dmark = demax_av / (demax_av + demin_av)
+
+// // Level Boundaries
+h1 = hline(0.3, "Lower Bound", color=color.gray)
+h2 = hline(0.7, "Upper Bound", color=color.gray)
+
+// Filling between levels
+fill(h1, h2, color=color.blue, transp=90)
+
+// Indicator display
+plot(dmark, title="DeMarker", color=color.orange, linewidth=2)

@@ -1,0 +1,27 @@
+#education purpose
+# indie:lang_version = 4
+from indie import indicator, param, plot, color, Plot, MutSeriesF
+from indie.algorithms import Sma
+
+@indicator("DeMarker")
+@param.int("per", default=13, min=1, title="Period")
+@plot(color=color.WHITE)
+def Main(self, per):
+    demax = MutSeriesF.new(0)
+    demin = MutSeriesF.new(0)
+    
+    if self.high[0] > self.high[1]:
+        demax[0] = self.high[0] - self.high[1]
+    
+    if self.low[0] < self.low[1]:
+        demin[0] = self.low[1] - self.low[0]
+    
+    demax_av = Sma.new(demax, per)
+    demin_av = Sma.new(demin, per)
+    
+    dmark = demax_av[0] / (demax_av[0] + demin_av[0])
+    
+    h1 = Plot(0.3, color=color.BLUE)
+    h2 = Plot(0.7, color=color.BLUE)
+    
+    return Plot(dmark), h1, h2

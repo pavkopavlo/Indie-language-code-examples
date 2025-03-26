@@ -1,0 +1,24 @@
+#education purpose
+#created by @insurgent https://takeprofit.com/@insurgent
+# indie:lang_version = 4
+from indie import indicator, plot, color, Plot
+
+@indicator('Pivot Points', overlay_main_pane=True)
+def Main(self):
+    pivot = (self.high[1] + self.low[1] + self.close[1]) / 3
+    support1 = (2 * pivot) - self.high[1]
+    resistance1 = (2 * pivot) - self.low[1]
+    support2 = pivot - (self.high[1] - self.low[1])
+    resistance2 = pivot + (self.high[1] - self.low[1])
+    support3 = self.low[1] - 2 * (self.high[1] - pivot)
+    resistance3 = self.high[1] + 2 * (pivot - self.low[1])
+    
+    return (
+        Plot(pivot, color=color.YELLOW),
+        Plot(support1, color=color.GREEN),
+        Plot(resistance1, color=color.RED),
+        Plot(support2, color=color.GREEN(0.7)),
+        Plot(resistance2, color=color.RED(0.7)),
+        Plot(support3, color=color.GREEN(0.5)),
+        Plot(resistance3, color=color.RED(0.5))
+    )

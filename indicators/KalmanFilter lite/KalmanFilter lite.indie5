@@ -1,0 +1,88 @@
+#education purposes
+# indie:lang_version = 5
+# Copyright (c) BigBeluga, licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0
+# Ported to Indie from PineScript by Claude
+
+from indie import indicator, MainContext, param, plot, color, MutSeriesF, algorithm, SeriesF, Optional, Color
+from indie.algorithms import Atr
+import math
+
+@algorithm
+def KalmanFilter(self, src: SeriesF, length: int, R: float = 0.01, Q: float = 0.1) -> SeriesF:
+    estimate = MutSeriesF.new(init=float('nan'))
+    error_est = MutSeriesF.new(init=1.0)
+    error_meas = MutSeriesF.new(init=R * length)
+    kalman_gain = MutSeriesF.new(init=0.0)
+    
+    if math.isnan(estimate[0]):
+        estimate[0] = src[1]
+    
+    prediction = estimate[0]
+    kalman_gain[0] = error_est[0] / (error_est[0] + error_meas[0])
+    estimate[0] = prediction + kalman_gain[0] * (src[0] - prediction)
+    error_est[0] = (1 - kalman_gain[0]) * error_est[0] + Q / length
+    
+    return estimate
+
+@indicator("Kalman Trend Levels [BigBeluga]", overlay_main_pane=True)
+@param.int("short_len", default=50, title="Short Length")
+@param.int("long_len", default=150, title="Long Length")
+@param.bool("retest_sig", default=False, title="Retest Signals")
+@param.bool("candle_color", default=True, title="Candle Color")
+@param.color("upper_col", default=color.rgba(19, 189, 110, 1.0), title="Up Color")
+@param.color("lower_col", default=color.rgba(175, 13, 75, 1.0), title="Down Color")
+@plot.line("p1", title="Short Kalman")
+@plot.line("p2", title="Long Kalman", line_width=2)
+@plot.fill("p1", "p2")
+class Main(MainContext):
+    def __init__(self):
+        self.prev_short_kalman = 0.0
+        self.prev_long_kalman = 0.0
+        self.prev_trend_up = False
+    
+    def calc(self, short_len, long_len, retest_sig, candle_color, upper_col, lower_col):
+        atr = Atr.new(200, "RMA")[0] * 0.5
+        
+        short_kalman_series = KalmanFilter.new(self.close, short_len)
+        long_kalman_series = KalmanFilter.new(self.close, long_len)
+        
+        short_kalman = short_kalman_series[0]
+        long_kalman = long_kalman_series[0]
+        
+        short_kalman_2 = self.prev_short_kalman
+        self.prev_short_kalman = short_kalman
+        
+        trend_up = short_kalman > long_kalman
+        prev_trend_up = self.prev_trend_up
+        self.prev_trend_up = trend_up
+        
+        trend_col = upper_col if trend_up else lower_col
+        trend_col1 = upper_col if short_kalman > short_kalman_2 else lower_col
+        
+        candle_col: Optional[Color] = None
+        if candle_color:
+            if trend_up and short_kalman > short_kalman_2:
+                candle_col = upper_col
+            elif not trend_up and short_kalman < short_kalman_2:
+                candle_col = lower_col
+            else:
+                candle_col = color.GRAY
+        
+        close_rounded = math.floor(self.close[0] * 10) / 10
+        
+        if trend_up and not prev_trend_up:
+            up_label_text = "\\u2B09\\n" + str(close_rounded)
+            pass
+        
+        if trend_up == prev_trend_up:
+            pass
+        
+        if prev_trend_up and not trend_up:
+            down_label_text = str(close_rounded) + "\\n\\u2B83"
+            pass
+        
+        return (
+            plot.Line(short_kalman, color=trend_col1),
+            plot.Line(long_kalman, color=trend_col),
+            plot.Fill(color=trend_col)
+        )

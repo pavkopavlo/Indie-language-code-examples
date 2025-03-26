@@ -8,8 +8,8 @@ How can I achieve this?
 You can use the `@plot.fill` decorator along with `plot.Fill()` to create a shaded area between two plot lines. The transparency is set using the alpha value in the color.
 Here’s a complete example:
 
-```
-pythonCopyEdit# indie:lang_version = 5
+```python
+#indie:lang_version = 5
 from indie import indicator, plot, color, MainContext
 from indie.algorithms import Sma
 

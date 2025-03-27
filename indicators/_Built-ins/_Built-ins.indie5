@@ -1,0 +1,1985 @@
+#Education purposes
+#Indie 5 Built-in indicators
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#accumulation%2Fdistribution)Accumulation/Distribution
+
+Accumulation/Distribution
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, format, plot, color
+from indie.algorithms import CumSum, Mfv
+
+
+@indicator('Accum/Dist', format=format.VOLUME)  # Accumulation/Distribution
+@plot.line(color=color.OLIVE)
+def Main(self):
+    return CumSum.new(Mfv.new())[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#advance%2Fdecline-ratio-bars)Advance/Decline Ratio (Bars)
+
+Advance/Decline Ratio (Bars)
+
+
+```
+# indie:lang_version = 5
+from math import isclose
+from indie import indicator, param, level, color, plot, MutSeriesF
+from indie.algorithms import Sum
+
+
+@indicator('ADR_B')  # Advance/Decline Ratio (Bars)
+@param.int('length', default=9, min=1)
+@level(1, line_color=color.GRAY, title='Equality Line')
+@plot.line(color=color.BLUE, title='ADR_B')
+def Main(self, length):
+    is_up = (self.close[0] - self.open[0]) >= 0.0
+
+    is_down_ints = MutSeriesF.new(0 if is_up else 1)
+    is_up_ints = MutSeriesF.new(1 if is_up else 0)
+
+    down_bars = Sum.new(is_down_ints, length)
+    up_bars = Sum.new(is_up_ints, length)
+
+    res = up_bars[0]
+    if not isclose(down_bars[0], 0):
+        res = up_bars[0] / down_bars[0]
+    return res
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#arnaud-legoux-moving-average)Arnaud Legoux Moving Average
+
+Arnaud Legoux Moving Average
+
+
+```
+# indie:lang_version = 5
+from math import exp, pow, nan, isclose
+from indie import indicator, param, plot, color
+
+
+@indicator('ALMA', overlay_main_pane=True)  # Arnaud Legoux Moving Average
+@param.int('window_size', default=9, min=1, title='Window Size')
+@param.float('offset', default=0.85)
+@param.float('sigma', default=6.0, min=0.001)
+@plot.line(color=color.BLUE)
+def Main(self, window_size, offset, sigma):
+    m = offset * (window_size - 1)
+    s = window_size / sigma
+    sum, norm = 0.0, 0.0
+    for i in range(window_size):
+        weight = exp(-1 * pow(i - m, 2) / (2 * pow(s, 2)))
+        norm += weight
+        sum += self.close[window_size - i - 1] * weight
+    res = nan
+    if not isclose(norm, 0):
+        res = sum / norm
+    return res
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#aroon)Aroon
+
+Aroon
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, plot, color
+from indie.algorithms import SinceLowest, SinceHighest
+
+
+@indicator('Aroon')
+@param.int('length', default=14, min=1)
+@plot.line(color=color.BLUE, title='Aroon Down')
+@plot.line(color=color.YELLOW, title='Aroon Up')
+def Main(self, length):
+    lo_offset = SinceLowest.new(self.low, length)
+    hi_offset = SinceHighest.new(self.high, length)
+
+    down = 100 * (length - lo_offset[0]) / length
+    up = 100 * (length - hi_offset[0]) / length
+
+    return down, up
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#average-day-range)Average Day Range
+
+Average Day Range
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, plot, color
+from indie.algorithms import Sma
+
+
+@indicator('ADR')  # Average Day Range
+@param.int('length', default=14, min=1)
+@plot.line(color=color.BLUE)
+def Main(self, length):
+    sma_high = Sma.new(self.high, length)
+    sma_low = Sma.new(self.low, length)
+    return sma_high[0] - sma_low[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#average-directional-index)Average Directional Index
+
+Average Directional Index
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, plot, color
+from indie.algorithms import Adx
+
+
+@indicator('ADX')  # Average Directional Index
+@param.int('adx_len', default=14, min=1, title='ADX Smoothing')
+@param.int('di_len', default=14, min=1, title='DI Length')
+@plot.line(color=color.RED)
+def Main(self, adx_len, di_len):
+    _, adx, _ = Adx.new(adx_len, di_len)
+    return adx[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#average-true-range)Average True Range
+
+Average True Range
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, plot, color
+from indie.algorithms import Atr
+
+
+@indicator('ATR')  # Average True Range
+@param.int('length', default=14, min=1)
+@param.str('smoothing', default='RMA', options=['RMA', 'SMA', 'EMA', 'WMA'], title='Smoothing')
+@plot.line(color=color.RED)
+def Main(self, length, smoothing):
+    return Atr.new(length, smoothing)[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#awesome-oscillator)Awesome Oscillator
+
+Awesome Oscillator
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, plot, color, MutSeriesF
+from indie.algorithms import Sma
+
+
+# TODO: Support palettes of colors in indicators
+@indicator('AO')  # Awesome Oscillator
+@plot.columns()
+def Main(self):
+    ao = MutSeriesF.new(Sma.new(self.hl2, 5)[0] - Sma.new(self.hl2, 34)[0])
+    d = ao[0] - ao[1]
+    c = color.MAROON if d <= 0 else color.GREEN
+    return plot.Columns(ao[0], color=c)
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#balance-of-power)Balance of Power
+
+Balance of Power
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, plot, color
+
+
+@indicator('BoP')  # Balance of Power
+@plot.line(color=color.RED)
+def Main(self):
+    res = nan
+    if not isclose(self.high[0] - self.low[0], 0):
+        res = (self.close[0] - self.open[0]) / (self.high[0] - self.low[0])
+    return res
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#bollinger-bands)Bollinger Bands
+
+Bollinger Bands
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Bb
+
+
+@indicator('BB', overlay_main_pane=True)  # Bollinger Bands
+@param.int('length', default=20, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@param.float('mult', default=2.0, min=0.001, max=50.0, title='StdDev')
+@param.int('offset', default=0, min=-500, max=500)
+@plot.line('lower', color=color.BLUE, title='Lower')
+@plot.line(color=color.RED, title='Basis')
+@plot.line('upper', color=color.BLUE, title='Upper')
+@plot.fill('lower', 'upper', color=color.AQUA(0.05), title='Background')
+def Main(self, length, src, mult, offset):
+    (lower, middle, upper) = Bb.new(src, length, mult)
+    return (
+        plot.Line(lower[0], offset=offset),
+        plot.Line(middle[0], offset=offset),
+        plot.Line(upper[0], offset=offset),
+        plot.Fill(offset=offset),
+    )
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#bollinger-bands-%25b)Bollinger Bands %B
+
+Bollinger Bands %B
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, param, source, band, color, level, plot
+from indie.algorithms import Bb
+
+
+@indicator('BB %B')  # Bollinger Bands %B
+@param.int('length', default=20, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@param.float('mult', default=2.0, min=0.001, max=50.0, title='StdDev')
+@band(0, 1, line_color=color.GRAY, fill_color=color.AQUA(0.1), title='Background')
+@level(0.5, line_color=color.GRAY, title='Middle Band')
+@plot.line(color=color.AQUA, title='Bollinger Bands %B')
+def Main(self, length, src, mult):
+    (lower, _, upper) = Bb.new(src, length, mult)
+    bbr = nan
+    if not isclose(upper[0] - lower[0], 0):
+        bbr = (src[0] - lower[0]) / (upper[0] - lower[0])
+    return bbr
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#bollinger-bands-width)Bollinger Bands Width
+
+Bollinger Bands Width
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Bb
+
+
+@indicator('BBW')  # Bollinger Bands Width
+@param.int('length', default=20, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@param.float('mult', default=2.0, min=0.001, max=50.0, title='StdDev')
+@plot.line(color=color.TEAL)
+def Main(self, length, src, mult):
+    (lower, middle, upper) = Bb.new(src, length, mult)
+    bww = nan
+    if not isclose(middle[0], 0):
+        bww = (upper[0] - lower[0]) / middle[0]
+    return bww
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#bull-bear-power)Bull Bear Power
+
+Bull Bear Power
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, plot, color
+from indie.algorithms import Ema
+
+
+@indicator('BBP')  # Bull Bear Power
+@param.int('length', default=13, min=1)
+@plot.line(color=color.BLUE)
+def Main(self, length):
+    bear_power = self.low[0] - Ema.new(self.close, length)[0]
+    bull_power = self.high[0] - Ema.new(self.close, length)[0]
+    return bull_power + bear_power
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#chaikin-money-flow)Chaikin Money Flow
+
+Chaikin Money Flow
+
+
+```
+# indie:lang_version = 5
+from math import isclose, nan
+from indie import indicator, param, level, color, plot
+from indie.algorithms import Sum, Mfv
+
+
+@indicator('CMF')  # Chaikin Money Flow
+@param.int('length', default=20, min=1, title='Length')
+@level(0, line_color=color.GRAY, title='Zero')
+@plot.line(color=color.GREEN, title='MF')
+def Main(self, length):
+    mfv_sum = Sum.new(Mfv.new(), length)[0]
+    vol_sum = Sum.new(self.volume, length)[0]
+
+    res = nan
+    if not isclose(vol_sum, 0):
+        res = mfv_sum / vol_sum
+    return res
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#chaikin-oscillator)Chaikin Oscillator
+
+Chaikin Oscillator
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, format, param, level, color, plot
+from indie.algorithms import CumSum, Mfv, Ema
+
+
+@indicator('Chaikin Osc', format=format.VOLUME)  # Chaikin Oscillator
+@param.int('fast_length', default=3, min=1, title='Fast Length')
+@param.int('slow_length', default=10, min=1, title='Slow Length')
+@level(0, line_color=color.GRAY, title='Zero')
+@plot.line(color=color.RED, title='Chaikin Oscillator')
+def Main(self, fast_length, slow_length):
+    ad = CumSum.new(Mfv.new())
+    ch_osc = Ema.new(ad, fast_length)[0] - Ema.new(ad, slow_length)[0]
+    return ch_osc
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#chande-kroll-stop)Chande Kroll Stop
+
+Chande Kroll Stop
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, plot, color, MutSeriesF
+from indie.algorithms import Atr, Lowest, Highest
+
+
+@indicator('Chande KS', overlay_main_pane=True)  # Chande Kroll Stop
+@param.int('p', default=10, min=1)
+@param.int('x', default=1, min=1)
+@param.int('q', default=9, min=1)
+@plot.line(color=color.BLUE, title='Stop Long')
+@plot.line(color=color.MAROON, title='Stop Short')
+def Main(self, p, x, q):
+    atr = Atr.new(p)[0]
+    first_low_stop = MutSeriesF.new(Lowest.new(self.low, p)[0] + x * atr)
+    first_high_stop = MutSeriesF.new(Highest.new(self.high, p)[0] - x * atr)
+    stop_long = Lowest.new(first_low_stop, q)
+    stop_short = Highest.new(first_high_stop, q)
+    return stop_long[0], stop_short[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#chande-momentum-oscillator)Chande Momentum Oscillator
+
+Chande Momentum Oscillator
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, param, source, level, color, plot, MutSeriesF
+from indie.algorithms import Change, Sum
+
+
+@indicator('Chande MO')  # Chande Momentum Oscillator
+@param.int('length', default=9, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@level(0, line_color=color.GRAY, title='Zero')
+@plot.line(color=color.BLUE, title='Chande MO')
+def Main(self, length, src):
+    momm = Change.new(src)[0]
+
+    m1 = momm if momm >= 0 else 0
+    m2 = 0.0 if momm >= 0 else -momm
+
+    sm1 = Sum.new(MutSeriesF.new(m1), length)[0]
+    sm2 = Sum.new(MutSeriesF.new(m2), length)[0]
+
+    res = nan
+    if not isclose(sm1 + sm2, 0):
+        res = 100 * (sm1 - sm2) / (sm1 + sm2)
+    return res
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#chop-zone)Chop Zone
+
+Chop Zone
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose, sqrt, isnan, acos, pi
+from indie import indicator, plot, color, Color
+from indie.algorithms import Highest, Lowest, Ema
+
+
+@indicator('Chop Zone')
+@plot.columns()
+def Main(self):
+    color_turquoise = color.rgba(38, 198, 218)
+    color_dark_green = color.rgba(67, 160, 71)
+    color_pale_green = color.rgba(165, 214, 167)
+    color_lime = color.rgba(0, 150, 136)
+    color_dark_red = color.rgba(213, 0, 0)
+    color_red = color.rgba(233, 30, 99)
+    color_orange = color.rgba(255, 109, 0)
+    color_light_orange = color.rgba(255, 183, 77)
+    color_yellow = color.rgba(253, 216, 53)
+
+    periods = 30
+    highest_high = Highest.new(self.high, periods)[0]
+    lowest_low = Lowest.new(self.low, periods)[0]
+    span = nan
+    if not isclose(highest_high - lowest_low, 0):
+        span = 25 / (highest_high - lowest_low) * lowest_low
+
+    ema34 = Ema.new(self.close, 34)
+    y2_ema34 = nan
+    if not isclose(self.hlc3[0], 0):
+        y2_ema34 = (ema34[1] - ema34[0]) / self.hlc3[0] * span
+
+    c_ema34 = sqrt(1 + y2_ema34 ** 2)
+    ema_angle_1 = nan
+    if not isnan(c_ema34):
+        ema_angle_1 = round(180 * acos(1 / c_ema34) / pi)  # or ema_angle_1 = round(180 * atan(y2_ema34) / pi)
+    ema_angle = -ema_angle_1 if y2_ema34 > 0 else ema_angle_1
+
+    chop_zone_color: Color
+    if ema_angle >= 5:
+        chop_zone_color = color_turquoise
+    elif ema_angle >= 3.57:
+        chop_zone_color = color_dark_green
+    elif ema_angle >= 2.14:
+        chop_zone_color = color_pale_green
+    elif ema_angle >= 0.71:
+        chop_zone_color = color_lime
+    elif ema_angle <= -5:
+        chop_zone_color = color_dark_red
+    elif ema_angle <= -3.57:
+        chop_zone_color = color_red
+    elif ema_angle <= -2.14:
+        chop_zone_color = color_orange
+    elif ema_angle <= -0.71:
+        chop_zone_color = color_light_orange
+    else:  # ema_angle > -0.71 and ema_angle < 0.71
+        chop_zone_color = color_yellow
+    return plot.Columns(1, color=chop_zone_color)
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#choppiness-index)Choppiness Index
+
+Choppiness Index
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose, log10
+from indie import indicator, param, band, color, level, plot
+from indie.algorithms import Highest, Lowest, Sum, Atr
+
+
+@indicator('CHOP')  # Choppiness Index
+@param.int('length', default=14, min=1)
+@param.int('offset', default=0, min=-500, max=500)
+@band(38.2, 61.8, line_color=color.GRAY, fill_color=color.AQUA(0.1), title='Background')
+@level(50, line_color=color.GRAY(0.5), title='Middle Band')
+@plot.line(color=color.BLUE, title='CHOP')
+def Main(self, length, offset):
+    hl = Highest.new(self.high, length)[0] - Lowest.new(self.low, length)[0]
+    res = nan
+    if not isclose(hl, 0) and not isclose(log10(length), 0):
+        res = 100 * log10(Sum.new(Atr.new(1), length)[0] / hl) / log10(length)
+    return plot.Line(res, offset=offset)
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#commodity-channel-index)Commodity Channel Index
+
+Commodity Channel Index
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, band, color, level, plot
+from indie.algorithms import Cci
+
+
+@indicator('CCI')  # Commodity Channel Index
+@param.int('length', default=20, min=1)
+@param.source('src', default=source.HLC3, title='Source')
+@band(-100, 100, line_color=color.GRAY, fill_color=color.AQUA(0.1), title='Background')
+@level(0, line_color=color.GRAY(0.5), title='Middle Band')
+@plot.line(color=color.BLUE, title='CCI')
+def Main(self, length, src):
+    return Cci.new(src, length)[0]
+    # TODO: implement smoothing when display.none is supported
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#connors-rsi)Connors RSI
+
+Connors RSI
+
+
+```
+# indie:lang_version = 5
+from math import isnan
+from indie import indicator, param, band, color, level, plot, MutSeriesF
+from indie.algorithms import Rsi, PercentRank, Roc
+
+
+def nan_to_zero(val: float) -> float:
+    return 0 if isnan(val) else val
+
+
+@indicator('CRSI')  # Connors RSI
+@param.int('len_rsi', default=3, min=1, title='RSI Length')
+@param.int('len_up_down', default=2, min=1, title='UpDown Length')
+@param.int('len_roc', default=100, min=1, title='ROC Length')
+@band(30, 70, line_color=color.GRAY, fill_color=color.AQUA(0.1), title='Background')
+@level(50, line_color=color.GRAY(0.5), title='Middle Band')
+@plot.line(color=color.BLUE, title='CRSI')
+def Main(self, len_rsi, len_up_down, len_roc):
+    is_equal = self.close[0] == self.close[1]
+    is_growing = self.close[0] > self.close[1]
+    ud = MutSeriesF.new(0)  # why not mut_series(init=0)
+    if is_growing:
+        if nan_to_zero(ud[1]) <= 0:  # why not equal nan_to_zero(ud)[1]
+            ud[0] = 1
+        else:
+            ud[0] = nan_to_zero(ud[1]) + 1
+    elif not is_equal:
+        if nan_to_zero(ud[1]) >= 0:
+            ud[0] = -1
+        else:
+            ud[0] = nan_to_zero(ud[1]) - 1
+
+    rsi = Rsi.new(self.close, len_rsi)[0]
+    ud_rsi = Rsi.new(ud, len_up_down)[0]
+    pr = PercentRank.new(Roc.new(self.close, 1), len_roc)[0]
+    return (rsi + ud_rsi + pr) / 3
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#coppock-curve)Coppock Curve
+
+Coppock Curve
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, plot, color, MutSeriesF
+from indie.algorithms import Roc, Wma
+
+
+@indicator('Coppock')  # Coppock Curve
+@param.int('wma_length', default=10, min=1, title='WMA Length')
+@param.int('long_roc_length', default=14, min=1, title='Long RoC Length')
+@param.int('short_roc_length', default=11, min=1, title='Short RoC Length')
+@plot.line(color=color.BLUE)
+def Main(self, wma_length, long_roc_length, short_roc_length):
+    l_roc = Roc.new(self.close, long_roc_length)[0]
+    s_roc = Roc.new(self.close, short_roc_length)[0]
+    curve = Wma.new(MutSeriesF.new(l_roc + s_roc), wma_length)[0]
+    return curve
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#correlation-coefficient)Correlation Coefficient
+
+Correlation Coefficient
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, MainContext, sec_context, format, param, source, param_ref, level, color, plot
+from indie.algorithms import Corr
+
+
+@sec_context
+@param_ref('source')
+def SecContext(self, source):
+    return source[0]
+
+
+@indicator('CC', format=format.PRICE, precision=2)  # Correlation Coefficient
+@param.str('exchange', default='NASDAQ')
+@param.str('ticker', default='GOOG')
+@param.source('source', default=source.CLOSE)
+@param.int('length', default=20, min=1)
+@level(1, line_color=color.GRAY)
+@level(0)
+@level(-1, line_color=color.GRAY)
+@plot.line(color=color.BLUE, title='Correlation')
+class Main(MainContext):
+    def __init__(self, exchange, ticker):
+        self.ctx_other = self.calc_on(SecContext, exchange=exchange, ticker=ticker)
+
+    def calc(self, source, length):
+        corr = Corr.new(source, self.ctx_other, length)
+        return corr[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#double-ema)Double EMA
+
+Double EMA
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Ema
+
+
+@indicator('DEMA', overlay_main_pane=True)  # Double EMA
+@param.int('length', default=9, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@plot.line(color=color.GREEN)
+def Main(self, length, src):
+    ema1 = Ema.new(src, length)
+    ema2 = Ema.new(ema1, length)
+    return 2 * ema1[0] - ema2[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#detrended-price-oscillator)Detrended Price Oscillator
+
+Detrended Price Oscillator
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, level, color, plot
+from indie.algorithms import Sma
+
+
+@indicator('DPO')  # Detrended Price Oscillator
+@param.int('length', default=21, min=1)
+@param.bool('centered', default=False, title='Centered')
+@level(0, line_color=color.GRAY, title='Zero')
+@plot.line(color=color.GREEN, title='Detrended Price Oscillator')
+def Main(self, length, centered):
+    bars_back = length // 2 + 1
+    ma = Sma.new(self.close, length)
+    dpo = self.close[bars_back] - ma[0] if centered else self.close[0] - ma[bars_back]
+    return plot.Line(dpo, offset=-bars_back if centered else 0)
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#directional-movement-index)Directional Movement Index
+
+Directional Movement Index
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, format, param, plot, color
+from indie.algorithms import Adx
+
+
+@indicator('DMI', format=format.PRICE, precision=4)  # Directional Movement Index
+@param.int('adx_len', default=14, min=1, title='ADX Smoothing')
+@param.int('di_len', default=14, min=1, title='DI Length')
+@plot.line(color=color.MAROON, title='-DI')
+@plot.line(color=color.RED, title='ADX')
+@plot.line(color=color.BLUE, title='+DI')
+def Main(self, adx_len, di_len):
+    minus, adx, plus = Adx.new(adx_len, di_len)
+    return minus[0], adx[0], plus[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#donchian-channels)Donchian Channels
+
+Donchian Channels
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, plot, color
+from indie.algorithms import Lowest, Highest, Donchian
+
+
+@indicator('DC', overlay_main_pane=True)  # Donchian Channels
+@param.int('length', default=20, min=1)
+@plot.line('lower', color=color.BLUE, title='Lower')
+@plot.line(color=color.RED, title='Basis')
+@plot.line('upper', color=color.BLUE, title='Upper')
+@plot.fill('lower', 'upper', color=color.AQUA(0.05), title='Background')
+def Main(self, length):
+    lower = Lowest.new(self.low, length)
+    upper = Highest.new(self.high, length)
+    basis = Donchian.new(length)
+    return lower[0], basis[0], upper[0], plot.Fill()
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#ease-of-movement)Ease of Movement
+
+Ease of Movement
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, format, param, plot, color, MutSeriesF
+from indie.algorithms import Change, Sma
+
+
+@indicator('EOM', format=format.VOLUME)  # Ease of Movement
+@param.int('length', default=14, min=1)
+@param.int('divisor', default=10000, min=1)
+@plot.line(color=color.GREEN)
+def Main(self, length, divisor):
+    eom = nan
+    if not isclose(self.volume[0], 0):
+        eom = divisor * Change.new(self.hl2)[0] * (self.high[0] - self.low[0]) / self.volume[0]
+    return Sma.new(MutSeriesF.new(eom), length)[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#elders-force-index)Elders Force Index
+
+Elders Force Index
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, format, param, level, color, plot, MutSeriesF
+from indie.algorithms import Change, Ema
+
+
+@indicator('EFI', format=format.VOLUME)  # Elders Force Index
+@param.int('length', default=13, min=1)
+@level(0, line_color=color.GRAY, title='Zero')
+@plot.line(color=color.RED, title='Elders Force Index')
+def Main(self, length):
+    efi = Change.new(self.close)[0] * self.volume[0]
+    return Ema.new(MutSeriesF.new(efi), length)[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#exponential-moving-average)Exponential Moving Average
+
+Exponential Moving Average
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Ema
+
+
+@indicator('EMA', overlay_main_pane=True)  # Moving Average Exponential
+@param.int('length', default=9, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@param.int('offset', default=0, min=-500, max=500, title='Offset')
+@plot.line(color=color.BLUE)
+def Main(self, length, src, offset):
+    ema = Ema.new(src, length)
+    return plot.Line(ema[0], offset=offset)
+    # TODO: implement smoothing when display.none is supported
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#envelope)Envelope
+
+Envelope
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Ema, Sma
+
+
+@indicator('Env', overlay_main_pane=True)  # Envelope
+@param.int('length', default=20, min=1)
+@param.float('percent', default=10.0)
+@param.source('src', default=source.CLOSE, title='Source')
+@param.bool('exponential', default=False)
+@plot.line('lower', color=color.BLUE, title='Lower')
+@plot.line('basis', color=color.RED, title='Basis')
+@plot.line('upper', color=color.BLUE, title='Upper')
+@plot.fill('lower', 'upper', color=color.AQUA(0.05), title='Background')
+def Main(self, length, percent, src, exponential):
+    basis = 0.0
+    if exponential:
+        basis = Ema.new(src, length)[0]
+    else:
+        basis = Sma.new(src, length)[0]
+    k = percent / 100.0
+    upper = basis * (1 + k)
+    lower = basis * (1 - k)
+    return lower, basis, upper, plot.Fill()
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#fisher-transform)Fisher Transform
+
+Fisher Transform
+
+
+```
+# indie:lang_version = 5
+from math import isnan, isclose, nan, log
+from indie import indicator, param, level, color, plot, MutSeriesF
+from indie.algorithms import Highest, Lowest
+
+
+def nan_to_zero(val: float) -> float:
+    return 0 if isnan(val) else val
+
+
+def round(val: float) -> float:
+    if val > 0.99:
+        val = 0.999
+    elif val < -0.99:
+        val = -0.999
+    return val
+
+
+@indicator('Fisher')  # Fisher Transform
+@param.int('length', default=9, min=1)
+@level(-1.5, line_color=color.RED, title='-1.5')
+@level(-0.75, line_color=color.GRAY, title='-0.75')
+@level(0, line_color=color.RED, title='0')
+@level(0.75, line_color=color.GRAY, title='0.75')
+@level(1.5, line_color=color.RED, title='1.5')
+@plot.line(color=color.BLUE, title='Fisher')
+@plot.line(color=color.MAROON, title='Trigger')
+def Main(self, length):
+    high = Highest.new(self.hl2, length)[0]
+    low = Lowest.new(self.hl2, length)[0]
+
+    value = MutSeriesF.new(init=0.0)
+    if not isclose(high - low, 0):
+        value[0] = round(0.66 * ((self.hl2[0] - low) / (high - low) - 0.5) + \
+                                 0.67 * nan_to_zero(value[1]))
+    fish = MutSeriesF.new(init=nan)
+    if not isclose(1 - value[0], 0):
+        fish[0] = 0.5 * log((1 + value[0]) / (1 - value[0])) + 0.5 * nan_to_zero(fish[1])
+    return fish[0], fish[1]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#hull-moving-average)Hull Moving Average
+
+Hull Moving Average
+
+
+```
+# indie:lang_version = 5
+from math import floor, sqrt
+from indie import indicator, param, source, plot, color, MutSeriesF
+from indie.algorithms import Wma
+
+
+@indicator('HMA', overlay_main_pane=True)  # Hull Moving Average
+@param.int('length', default=9, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@plot.line(color=color.BLUE)
+def Main(self, length, src):
+    wma_l2 = Wma.new(src, length // 2)[0]
+    wma_l = Wma.new(src, length)[0]
+    return Wma.new(MutSeriesF.new(2 * wma_l2 - wma_l), floor(sqrt(length)))[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#ichimoku-cloud)Ichimoku Cloud
+
+Ichimoku Cloud
+
+
+```
+# indie:lang_version = 5
+from indie import SeriesF, MutSeriesF, indicator, param, plot, color
+from indie.algorithms import Donchian
+
+
+def mean(price1: SeriesF, price2: SeriesF) -> float:
+    # TODO: implement @algorithm avg with variable number of arguments in indie.algorithms
+    return (price1[0] + price2[0]) / 2
+
+
+# TODO: Add palette of colors
+@indicator('Ichimoku', overlay_main_pane=True)  # Ichimoku Cloud
+@param.int('conversion_periods', default=9, min=1, title='Conversion Line Length')
+@param.int('base_periods', default=26, min=1, title='Base Line Length')
+@param.int('lagging_span_2_periods', default=52, min=1, title='Leading Span B Length')
+@param.int('displacement', default=26, min=1, title='Lagging Span')
+@plot.line(color=color.BLUE, title='Conversion Line')
+@plot.line(color=color.RED, title='Base Line')
+@plot.line(color=color.GREEN, title='Lagging Span')
+@plot.line('ls_a', color=color.GREEN(0.6), title='Leading Span A')
+@plot.line('ls_b', color=color.RED(0.6), title='Leading Span B')
+@plot.fill('ls_a', 'ls_b', title='Background')
+def Main(self, conversion_periods, base_periods, lagging_span_2_periods, displacement):
+    conversion_line = Donchian.new(conversion_periods)
+    base_line = Donchian.new(base_periods)
+    lead_line1 = mean(conversion_line, base_line)
+    lead_line2 = Donchian.new(lagging_span_2_periods)[0]
+    fill_color = color.GREEN(0.1) if lead_line1 > lead_line2 else color.RED(0.1)
+
+    return (
+        conversion_line[0],
+        base_line[0],
+        plot.Line(self.close[0], offset=-displacement + 1),
+        plot.Line(lead_line1, offset=displacement - 1),
+        plot.Line(lead_line2, offset=displacement - 1),
+        plot.Fill(offset=displacement - 1, color=fill_color),
+    )
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#keltner-channels)Keltner Channels
+
+Keltner Channels
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color, MutSeriesF
+from indie.algorithms import Ma, Tr, Atr, Rma
+
+
+@indicator('KC', overlay_main_pane=True)  # Keltner Channels
+@param.int('length', default=20, min=1)
+@param.float('mult', default=2.0, title='Multiplier')
+@param.source('src', default=source.CLOSE, title='Source')
+@param.bool('exp', default=True, title='Use Exponential MA')
+@param.str('bands_style', default='Average True Range', title='Bands Style',
+           options=['Average True Range', 'True Range', 'Range'])
+@param.int('atr_length', default=10, min=1, title='ATR Length')
+@plot.line('lower', color=color.BLUE, title='Lower')
+@plot.line(color=color.BLUE, title='Basis')
+@plot.line('upper', color=color.BLUE, title='Upper')
+@plot.fill('lower', 'upper', color=color.AQUA(0.05), title='Background')
+def Main(self, length, mult, src, exp, bands_style, atr_length):
+    ma = Ma.new(src, length, 'EMA' if exp else 'SMA')[0]
+    range_ma = 0.0
+    if bands_style == 'True Range':
+        range_ma = Tr.new(True)[0]
+    elif bands_style == 'Average True Range':
+        range_ma = Atr.new(atr_length)[0]
+    else:  # bands_style == 'Range'
+        range_ma = Rma.new(MutSeriesF.new(self.high[0] - self.low[0]), length)[0]
+    upper = ma + range_ma * mult
+    lower = ma - range_ma * mult
+    return lower, ma, upper, plot.Fill()
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#klinger-oscillator)Klinger Oscillator
+
+Klinger Oscillator
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, format, plot, color, MutSeriesF
+from indie.algorithms import Change, Ema
+
+
+@indicator('Klinger Osc', format=format.VOLUME)  # Klinger Oscillator
+@plot.line(color=color.BLUE, title='KO')
+@plot.line(color=color.GREEN, title='Signal')
+def Main(self):
+    sv = MutSeriesF.new(self.volume[0] if Change.new(self.hlc3)[0] >= 0 else -self.volume[0])
+    kvo = MutSeriesF.new(Ema.new(sv, 34)[0] - Ema.new(sv, 55)[0])
+    sig = Ema.new(kvo, 13)
+    return kvo[0], sig[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#know-sure-thing)Know Sure Thing
+
+Know Sure Thing
+
+
+```
+# indie:lang_version = 5
+from indie import algorithm, MutSeriesF, SeriesF, indicator, format, param, level, color, plot
+from indie.algorithms import Sma, Roc
+
+
+@algorithm
+def SmaRoc(self, roc_len: int, sma_len: int) -> SeriesF:
+    return Sma.new(Roc.new(self.ctx.close, roc_len), sma_len)
+
+
+@indicator('KST', format=format.PRICE, precision=4)  # Know Sure Thing
+@param.int('roc_len1', default=10, min=1, title='ROC Length #1')
+@param.int('roc_len2', default=15, min=1, title='ROC Length #2')
+@param.int('roc_len3', default=20, min=1, title='ROC Length #3')
+@param.int('roc_len4', default=30, min=1, title='ROC Length #4')
+@param.int('sma_len1', default=10, min=1, title='SMA Length #1')
+@param.int('sma_len2', default=10, min=1, title='SMA Length #2')
+@param.int('sma_len3', default=10, min=1, title='SMA Length #3')
+@param.int('sma_len4', default=15, min=1, title='SMA Length #4')
+@param.int('sig_len', default=9, min=1, title='Signal Line Length')
+@level(0, line_color=color.GRAY, title='Zero')
+@plot.line(color=color.GREEN, title='KST')
+@plot.line(color=color.RED, title='Signal')
+def Main(self, roc_len1, roc_len2, roc_len3, roc_len4, sma_len1, sma_len2, sma_len3, sma_len4, sig_len):
+    kst = 1 * SmaRoc.new(roc_len1, sma_len1)[0] + \
+          2 * SmaRoc.new(roc_len2, sma_len2)[0] + \
+          3 * SmaRoc.new(roc_len3, sma_len3)[0] + \
+          4 * SmaRoc.new(roc_len4, sma_len4)[0]
+    sig = Sma.new(MutSeriesF.new(kst), sig_len)[0]
+    return kst, sig
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#moving-average-ribbon)Moving Average Ribbon
+
+Moving Average Ribbon
+
+
+```
+# indie:lang_version = 5
+from math import nan
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Ma
+
+
+@indicator('MA Ribbon', overlay_main_pane=True)  # Moving Average Ribbon
+@param.bool('ma1', default=True, title='Show MA №1')
+@param.str('ma1_type', default='SMA', title='MA №1 Type', options=['SMA', 'EMA', 'SMMA (RMA)', 'WMA', 'VWMA'])
+@param.source('ma1_source', default=source.CLOSE, title='MA №1 Source')
+@param.int('ma1_length', default=20, min=1, title='MA №1 Length')
+@param.bool('ma2', default=True, title='Show MA №2')
+@param.str('ma2_type', default='SMA', title='MA №2 Type', options=['SMA', 'EMA', 'SMMA (RMA)', 'WMA', 'VWMA'])
+@param.source('ma2_source', default=source.CLOSE, title='MA №2 Source')
+@param.int('ma2_length', default=50, min=1, title='MA №2 Length')
+@param.bool('ma3', default=True, title='Show MA №3')
+@param.str('ma3_type', default='SMA', title='MA №3 Type', options=['SMA', 'EMA', 'SMMA (RMA)', 'WMA', 'VWMA'])
+@param.source('ma3_source', default=source.CLOSE, title='MA №3 Source')
+@param.int('ma3_length', default=100, min=1, title='MA №3 Length')
+@param.bool('ma4', default=True, title='Show MA №4')
+@param.str('ma4_type', default='SMA', title='MA №4 Type', options=['SMA', 'EMA', 'SMMA (RMA)', 'WMA', 'VWMA'])
+@param.source('ma4_source', default=source.CLOSE, title='MA №4 Source')
+@param.int('ma4_length', default=200, min=1, title='MA №4 Length')
+@plot.line(color=color.rgba(246, 195, 9), title='MA №1')
+@plot.line(color=color.rgba(251, 152, 0), title='MA №2')
+@plot.line(color=color.rgba(251, 101, 0), title='MA №3')
+@plot.line(color=color.rgba(246, 12, 12), title='MA №4')
+def Main(self, ma1, ma1_type, ma1_source, ma1_length, \
+         ma2, ma2_type, ma2_source, ma2_length, \
+         ma3, ma3_type, ma3_source, ma3_length, \
+         ma4, ma4_type, ma4_source, ma4_length):
+    ma1_val = Ma.new(ma1_source, ma1_length, ma1_type)[0]
+    ma2_val = Ma.new(ma2_source, ma2_length, ma2_type)[0]
+    ma3_val = Ma.new(ma3_source, ma3_length, ma3_type)[0]
+    ma4_val = Ma.new(ma4_source, ma4_length, ma4_type)[0]
+    return ma1_val if ma1 else nan, \
+           ma2_val if ma2 else nan, \
+           ma3_val if ma3 else nan, \
+           ma4_val if ma4 else nan
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#moving-average-convergence-divergence)Moving Average Convergence Divergence
+
+Moving Average Convergence Divergence
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, level, color, plot, MutSeriesF, Color
+from indie.algorithms import Ma
+
+
+@indicator('MACD')  # Moving Average Convergence Divergence
+@param.int('fast_length', default=12, min=1, title='Fast Length')
+@param.int('slow_length', default=26, min=1, title='Slow Length')
+@param.source('src', default=source.CLOSE, title='Source')
+@param.int('signal_length', default=9, min=1, max=50, title='Signal Smoothing')
+@param.str('sma_source', default='EMA', title='Oscillator MA Type', options=['SMA', 'EMA'])
+@param.str('sma_signal', default='EMA', title='Signal Line MA Type', options=['SMA', 'EMA'])
+@level(0, line_color=color.GRAY(0.5))
+@plot.columns(title='Histogram')
+@plot.line(color=color.BLUE, title='MACD')
+@plot.line(color=color.MAROON, title='Signal')
+def Main(self, fast_length, slow_length, src, signal_length, sma_source, sma_signal):
+    fast_ma = Ma.new(src, fast_length, sma_source)
+    slow_ma = Ma.new(src, slow_length, sma_source)
+    macd = MutSeriesF.new(fast_ma[0] - slow_ma[0])
+    signal = Ma.new(macd, signal_length, sma_signal)
+    hist = MutSeriesF.new(macd[0] - signal[0])
+
+    hist_color: Color
+    if hist[0] >= 0:
+        if hist[1] < hist[0]:
+            hist_color = color.GREEN
+        else:
+            hist_color = color.LIME
+    else:
+        if hist[1] < hist[0]:
+            hist_color = color.RED
+        else:
+            hist_color = color.MAROON
+
+    return (
+        plot.Columns(hist[0], color=hist_color),
+        macd[0],
+        signal[0],
+    )
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#mass-index)Mass Index
+
+Mass Index
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, param, plot, color, MutSeriesF
+from indie.algorithms import Ema, Sum
+
+
+@indicator('Mass Index')
+@param.int('length', default=10, min=1)
+@plot.line(color=color.BLUE)
+def Main(self, length):
+    span = MutSeriesF.new(self.high[0] - self.low[0])
+    ema1 = Ema.new(span, 9)
+    ema2 = Ema.new(ema1, 9)
+    res = nan
+    if not isclose(ema2[0], 0):
+        res = Sum.new(MutSeriesF.new(ema1[0] / ema2[0]), length)[0]
+    return res
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#mcginley-dynamic)McGinley Dynamic
+
+McGinley Dynamic
+
+
+```
+# indie:lang_version = 5
+from math import isnan, nan, isclose, pow
+from indie import indicator, param, plot, color, MutSeriesF
+from indie.algorithms import Ema
+
+
+@indicator('McGinley', overlay_main_pane=True)  # McGinley Dynamic
+@param.int('length', default=14, min=1)
+@plot.line(color=color.BLUE)
+def Main(self, length):
+    mg = MutSeriesF.new(init=0)
+    if isnan(mg[1]):
+        mg[0] = Ema.new(self.close, length)[0]
+    else:
+        mg[0] = nan
+        if not isclose(mg[1], 0) and not isclose(pow(self.close[0] / mg[1], 4), 0):
+            mg[0] = mg[1] + (self.close[0] - mg[1]) / (length * pow(self.close[0] / mg[1], 4))
+    return mg[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#median)Median
+
+Median
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color, MutSeriesF
+from indie.algorithms import Median, Atr, Ema
+
+
+@indicator('Median', overlay_main_pane=True)
+@param.source('src', default=source.HL2, title='Source')
+@param.int('length', default=3, min=1, title='Median Length')
+@param.int('atr_length', default=14, min=1, title='ATR Length')
+@param.int('atr_mult', default=2, min=1, title='ATR Multiplier')
+@plot.line('ema', color=color.BLUE, title='Median EMA')
+@plot.line(color=color.FUCHSIA, title='Lower Band')
+@plot.line('median', color=color.RED, line_width=3, title='Median')
+@plot.line(color=color.LIME, title='Upper Band')
+@plot.fill('median', 'ema', title='Background')
+def Main(self, src, length, atr_length, atr_mult):
+    median = Median.new(src, length)[0]
+
+    atr = atr_mult * Atr.new(atr_length)[0]
+
+    median_ema = Ema.new(MutSeriesF.new(median), length)[0]
+
+    fill_color = color.LIME(0.9) if median > median_ema else color.FUCHSIA(0.9)
+    return (
+        median_ema,
+        median - atr,
+        median,
+        median + atr,
+        plot.Fill(color=fill_color),
+    )
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#momentum)Momentum
+
+Momentum
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Change
+
+
+@indicator('Mom')  # Momentum
+@param.int('length', default=10, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@plot.line(color=color.BLUE)
+def Main(self, length, src):
+    return Change.new(src, length)[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#money-flow-index)Money Flow Index
+
+Money Flow Index
+
+
+```
+# indie:lang_version = 5
+from math import isclose
+from indie import indicator, param, source, band, color, level, plot, MutSeriesF
+from indie.algorithms import NanToZero, Change, Sum
+
+
+@indicator('MFI')  # Money Flow Index
+@param.int('length', default=14, min=1)
+@param.source('src', default=source.HLC3, title='Source')
+@band(20, 80, line_color=color.GRAY, fill_color=color.PURPLE(0.1), title='Background')
+@level(50, line_color=color.GRAY, title='Middle Band')
+@plot.line(color=color.PURPLE, title='MF')
+def Main(self, length, src):
+    upper_raw = MutSeriesF.new(self.volume[0] * (src[0] if NanToZero.new(Change.new(src))[0] > 0 else 0.0))
+    upper = Sum.new(upper_raw, length)
+
+    lower_raw = MutSeriesF.new(self.volume[0] * (src[0] if NanToZero.new(Change.new(src))[0] < 0 else 0.0))
+    lower = Sum.new(lower_raw, length)
+
+    res = 100.0
+    if not isclose(lower[0], 0):
+        res = 100.0 - (100.0 / (1.0 + upper[0] / lower[0]))
+    return res
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#net-volume)Net Volume
+
+Net Volume
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, format, plot, color
+from indie.algorithms import NetVolume
+
+
+@indicator('Net Volume', format=format.VOLUME)
+@plot.line(color=color.BLUE)
+def Main(self):
+    return NetVolume.new(self.close)[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#on-balance-volume)On Balance Volume
+
+On Balance Volume
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, format, plot, color
+from indie.algorithms import CumSum, NanToZero, NetVolume
+
+
+@indicator('OBV', format=format.VOLUME)  # On Balance Volume
+@plot.line(color=color.BLUE)
+def Main(self):
+    return CumSum.new(NanToZero.new(NetVolume.new(self.close)))[0]
+    # TODO: implement smoothing when display.none is supported
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#price-oscillator)Price Oscillator
+
+Price Oscillator
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, param, source, level, color, plot
+from indie.algorithms import Ema, Sma
+
+
+@indicator('PPO')  # Price Oscillator
+@param.int('short_len', default=10, min=1, title='Short Length')
+@param.int('long_len', default=21, min=1, title='Long Length')
+@param.source('src', default=source.CLOSE, title='Source')
+@param.bool('exponential', default=False)
+@level(0, line_color=color.GRAY, title='Zero')
+@plot.line(color=color.GREEN, title='OSC')
+def Main(self, short_len, long_len, src, exponential):
+    short, long = 0.0, 0.0
+    if exponential:
+        short = Ema.new(src, short_len)[0]
+        long = Ema.new(src, long_len)[0]
+    else:
+        short = Sma.new(src, short_len)[0]
+        long = Sma.new(src, long_len)[0]
+    po = nan
+    if not isclose(long, 0):
+        po = 100 * (short - long) / long
+    return po
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#price-volume-trend)Price Volume Trend
+
+Price Volume Trend
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, format, plot, color, MutSeriesF
+from indie.algorithms import CumSum, NanToZero, Change
+
+
+@indicator('PVT', format=format.VOLUME)  # Price Volume Trend
+@plot.line(color=color.BLUE)
+def Main(self):
+    res = nan
+    if not isclose(self.close[1], 0):
+        res = CumSum.new(NanToZero.new(MutSeriesF.new(Change.new(self.close)[0] / self.close[1] * self.volume[0])))[0]
+    return res
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#rate-of-change)Rate Of Change
+
+Rate Of Change
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, level, color, plot
+from indie.algorithms import Roc
+
+
+@indicator('ROC')  # Rate Of Change
+@param.int('length', default=9, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@level(0, line_color=color.GRAY, title='Zero')
+@plot.line(color=color.BLUE, title='ROC')
+def Main(self, length, src):
+    return Roc.new(src, length)[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#relative-vigor-index)Relative Vigor Index
+
+Relative Vigor Index
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import algorithm, SeriesF, MutSeriesF, indicator, format, param, plot, color
+from indie.algorithms import Sum
+
+
+@algorithm  # Symmetrically Weighted Moving Average
+def Swma(self, src: SeriesF) -> SeriesF:
+    return MutSeriesF.new(src[3] / 6 + src[2] / 3 + src[1] / 3 + src[0] / 6)
+
+
+@indicator('RVGI', format=format.PRICE, precision=4)  # Relative Vigor Index
+@param.int('length', default=10, min=1)
+@param.int('offset', default=0, min=-500, max=500)
+@plot.line(color=color.GREEN, title='RVGI')
+@plot.line(color=color.RED, title='Signal')
+def Main(self, length, offset):
+    cl_op_sum = Sum.new(Swma.new(MutSeriesF.new(self.close[0] - self.open[0])), length)[0]
+    hi_lo_sum = Sum.new(Swma.new(MutSeriesF.new(self.high[0] - self.low[0])), length)[0]
+    rvi = nan
+    if not isclose(hi_lo_sum, 0):
+        rvi = cl_op_sum / hi_lo_sum
+    sig = Swma.new(MutSeriesF.new(rvi))[0]
+    return plot.Line(rvi, offset=offset), plot.Line(sig, offset=offset)
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#relative-volatility-index)Relative Volatility Index
+
+Relative Volatility Index
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, param, band, color, level, plot, MutSeriesF
+from indie.algorithms import StdDev, Ema, Change, Bb, Ma
+
+
+@indicator('RVI')  # Relative Volatility Index
+@param.int('length', default=10, min=1)
+@param.int('offset', default=0, min=-500, max=500)
+@param.str('ma_type', default='SMA', title='MA Type', options=['SMA', 'Bollinger Bands', 'EMA', 'SMMA (RMA)', 'WMA', 'VWMA'])
+@param.int('ma_length', default=14, title='MA Length', min=1)
+@param.float('bb_mult', default=2.0, title='BB StdDev', min=0.001, max=50)
+@band(20, 80, line_color=color.GRAY, fill_color=color.PURPLE(0.1))
+@level(50, line_color=color.GRAY(0.5))
+@plot.line(color=color.YELLOW, title='RVI-based MA')
+@plot.line(color=color.PURPLE, title='RVI')
+@plot.line('bb_lower', color=color.GREEN, title='Lower Bollinger Band')
+@plot.line('bb_upper', color=color.GREEN, title='Upper Bollinger Band')
+@plot.fill('bb_lower', 'bb_upper', color=color.GREEN(0.1), title='Bollinger Bands Background Fill')
+def Main(self, length, offset, ma_type, ma_length, bb_mult):
+    dev = StdDev.new(self.close, length)[0]
+    upper = Ema.new(MutSeriesF.new(0 if Change.new(self.close)[0] <= 0 else dev), 14)[0]
+    lower = Ema.new(MutSeriesF.new(0 if Change.new(self.close)[0] > 0 else dev), 14)[0]
+
+    rvi = MutSeriesF.new(init=nan)
+    if not isclose(upper + lower, 0):
+        rvi[0] = 100 * upper / (upper + lower)
+
+    low_value, rvi_ma, high_value = nan, nan, nan
+    if ma_type == 'Bollinger Bands':
+        (bb_lower, bb_middle, bb_upper) = Bb.new(rvi, ma_length, bb_mult)
+        low_value = bb_lower[0]
+        rvi_ma = bb_middle[0]
+        high_value = bb_upper[0]
+    else:
+        rvi_ma = Ma.new(rvi, ma_length, ma_type)[0]
+
+    return (
+        plot.Line(rvi_ma, offset=offset),
+        plot.Line(rvi[0], offset=offset),
+        low_value,
+        high_value,
+        plot.Fill(),
+    )
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#relative-strength-index)Relative Strength Index
+
+Relative Strength Index
+
+
+```
+# indie:lang_version = 5
+from math import nan
+from indie import indicator, param, source, band, color, level, plot
+from indie.algorithms import Rsi, Ma, StdDev
+
+
+@indicator('RSI')  # Relative Strength Index
+@param.int('rsi_length', default=14, title='RSI Length', min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@param.str('ma_type', default='SMA', title='MA Type',
+           options=['SMA', 'Bollinger Bands', 'EMA', 'SMMA (RMA)', 'WMA', 'VWMA'])
+@param.int('ma_length', default=14, title='MA Length', min=1)
+@param.float('bb_mult', default=2.0, title='BB StdDev', min=0.001, max=50)
+@band(30, 70, line_color=color.GRAY, fill_color=color.PURPLE(0.1))
+@level(50, line_color=color.GRAY(0.5))
+@plot.line(color=color.YELLOW, title='RSI-based MA')
+@plot.line(color=color.PURPLE, title='RSI')
+@plot.line('bb_lower', color=color.GREEN, title='RSI Lower Band')
+@plot.line('bb_upper', color=color.GREEN, title='RSI Upper Band')
+@plot.fill('bb_lower', 'bb_upper', color=color.GREEN(0.1), title='Bollinger Bands Background Fill')
+def Main(self, rsi_length, src, ma_type, ma_length, bb_mult):
+    rsi = Rsi.new(src, rsi_length)
+
+    is_bb = ma_type == 'Bollinger Bands'
+
+    ma_algorithm = 'SMA' if is_bb else ma_type
+    rsi_ma = Ma.new(rsi, ma_length, ma_algorithm)
+
+    std_dev = StdDev.new(rsi, ma_length)
+    bb_lower = rsi_ma[0] - std_dev[0] * bb_mult if is_bb else nan
+    bb_upper = rsi_ma[0] + std_dev[0] * bb_mult if is_bb else nan
+    return rsi_ma[0], rsi[0], bb_lower, bb_upper, plot.Fill()
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#simple-moving-average)Simple Moving Average
+
+Simple Moving Average
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Sma
+
+
+@indicator('SMA', overlay_main_pane=True)  # Simple Moving Average
+@param.int('length', default=9, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@param.int('offset', default=0, min=-500, max=500, title='Offset')
+@plot.line(color=color.BLUE)
+def Main(self, length, src, offset):
+    sma = Sma.new(src, length)
+    return plot.Line(sma[0], offset=offset)
+    # TODO: implement smoothing when display.none is supported
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#smi-ergodic-indicator)SMI Ergodic Indicator
+
+SMI Ergodic Indicator
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, format, param, plot, color
+from indie.algorithms import Tsi, Ema
+
+
+@indicator('SMII', format=format.PRICE, precision=4)  # SMI Ergodic Indicator
+@param.int('long_len', default=20, min=1, title='Long Length')
+@param.int('short_len', default=5, min=1, title='Short Length')
+@param.int('signal_len', default=5, min=1, title='Signal Length')
+@plot.line(color=color.BLUE, title='SMI')
+@plot.line(color=color.MAROON, title='Signal')
+def Main(self, long_len, short_len, signal_len):
+    tsi = Tsi.new(self.close, long_len, short_len)
+    return tsi[0], Ema.new(tsi, signal_len)[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#smi-ergodic-oscillator)SMI Ergodic Oscillator
+
+SMI Ergodic Oscillator
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, format, param, plot, color
+from indie.algorithms import Tsi, Ema
+
+
+@indicator('SMIO', format=format.PRICE, precision=4)  # SMI Ergodic Oscillator
+@param.int('long_len', default=20, min=1, title='Long Length')
+@param.int('short_len', default=5, min=1, title='Short Length')
+@param.int('signal_len', default=5, min=1, title='Signal Length')
+@plot.histogram(color=color.RED)
+def Main(self, long_len, short_len, signal_len):
+    tsi = Tsi.new(self.close, long_len, short_len)
+    return tsi[0] - Ema.new(tsi, signal_len)[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#smoothed-moving-average)Smoothed Moving Average
+
+Smoothed Moving Average
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Rma
+
+
+@indicator('SMMA', overlay_main_pane=True)  # Smoothed Moving Average
+@param.int('length', default=7, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@plot.line(color=color.PURPLE)
+def Main(self, length, src):
+    return Rma.new(src, length)[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#stochastic-oscillator)Stochastic Oscillator
+
+Stochastic Oscillator
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, band, color, level, plot
+from indie.algorithms import Sma, Stoch
+
+
+@indicator('Stoch')  # Stochastic
+@param.int('k_length', default=14, min=1, title='Fast K stochastic length')
+@param.int('k_smoothing', default=1, min=1, title='Fast K stochastic smoothing')
+@param.int('d_smoothing', default=3, min=1, title='Slow D stochastic smoothing')
+@band(20, 80, fill_color=color.AQUA(0.1), line_color=color.GRAY, title='Background')
+@level(50, line_color=color.GRAY(0.5), title='Middle Band')
+@plot.line(color=color.BLUE, title='%K')
+@plot.line(color=color.RED, title='%D')
+def Main(self, k_length, k_smoothing, d_smoothing):
+    k = Sma.new(Stoch.new(self.close, self.low, self.high, k_length), k_smoothing)
+    d = Sma.new(k, d_smoothing)
+    return k[0], d[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#stochastic-rsi)Stochastic RSI
+
+Stochastic RSI
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, band, color, level, plot
+from indie.algorithms import Rsi, Stoch, Sma
+
+
+@indicator('Stoch RSI')  # Stochastic RSI
+@param.int('k_smoothing', default=3, min=1, title='Fast K stochastic smoothing')
+@param.int('d_smoothing', default=3, min=1, title='Slow D stochastic smoothing')
+@param.int('rsi_length', default=14, min=1, title='RSI length')
+@param.int('k_length', default=14, min=1, title='Stochastic Length')
+@param.source('src', default=source.CLOSE, title='Source')
+@band(20, 80, fill_color=color.AQUA(0.1), line_color=color.GRAY, title='Background')
+@level(50, line_color=color.GRAY(0.5), title='Middle Band')
+@plot.line(color=color.BLUE, title='K')
+@plot.line(color=color.RED, title='D')
+def Main(self, k_smoothing, d_smoothing, rsi_length, k_length, src):
+    rsi = Rsi.new(src, rsi_length)
+    k = Sma.new(Stoch.new(rsi, rsi, rsi, k_length), k_smoothing)
+    d = Sma.new(k, d_smoothing)
+    return k[0], d[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#supertrend)Supertrend
+
+Supertrend
+
+
+```
+# indie:lang_version = 5
+from math import nan
+from indie import indicator, param, plot, color
+from indie.algorithms import Supertrend
+
+
+@indicator('Supertrend', overlay_main_pane=True)
+@param.int('atr_period', default=10, min=1)
+@param.float('factor', default=3.0)
+@param.str('ma_algorithm', default='RMA', options=['RMA', 'SMA', 'EMA', 'WMA'])
+@plot.line('middle', color=color.GRAY(0.5), title='Body Middle')  # TODO: support display.none
+@plot.line('down', color=color.RED, title='Down Trend')
+@plot.line('up', color=color.GREEN, title='Up Trend')
+@plot.fill('down', 'middle', color=color.RED(0.1), title='Down-Middle Fill')
+@plot.fill('middle', 'up', color=color.GREEN(0.1), title='Middle-Up Fill')
+def Main(self, factor, atr_period, ma_algorithm):
+    st, direction = Supertrend.new(factor, atr_period, ma_algorithm)
+    st_down = st[0] if direction[0] > 0 else nan
+    st_up = st[0] if direction[0] < 0 else nan
+    middle = (self.open[0] + self.close[0]) / 2
+    return middle, st_down, st_up, plot.Fill(), plot.Fill()
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#triple-ema)Triple EMA
+
+Triple EMA
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Ema
+
+
+@indicator('TEMA', overlay_main_pane=True)  # Triple EMA
+@param.int('length', default=9, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@plot.line(color=color.BLUE)
+def Main(self, length, src):
+    ema1 = Ema.new(src, length)
+    ema2 = Ema.new(ema1, length)
+    ema3 = Ema.new(ema2, length)
+    return 3 * (ema1[0] - ema2[0]) + ema3[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#trix)TRIX
+
+TRIX
+
+
+```
+# indie:lang_version = 5
+from math import log
+from indie import indicator, param, level, color, plot, MutSeriesF
+from indie.algorithms import Change, Ema
+
+
+@indicator('TRIX')
+@param.int('length', default=18, min=1)
+@level(0, line_color=color.GRAY, title='Zero')
+@plot.line(color=color.RED, title='TRIX')
+def Main(self, length):
+    return 10000 * Change.new(Ema.new(Ema.new(Ema.new(MutSeriesF.new(log(self.close[0])), length), length), length))[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#true-strength-indicator)True Strength Indicator
+
+True Strength Indicator
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, format, param, level, color, plot
+from indie.algorithms import Tsi, Ema
+
+
+@indicator('TSI', format=format.PRICE, precision=4)  # True Strength Indicator
+@param.int('long_len', default=25, min=1, title='Long Length')
+@param.int('short_len', default=13, min=1, title='Short Length')
+@param.int('signal_len', default=13, min=1, title='Signal Length')
+@level(0, line_color=color.GRAY, title='Zero')
+@plot.line(color=color.BLUE, title='TSI')
+@plot.line(color=color.RED, title='Signal')
+def Main(self, long_len, short_len, signal_len):
+    tsi = Tsi.new(self.close, long_len, short_len)
+    return 100 * tsi[0], 100 * Ema.new(tsi, signal_len)[0]
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#ultimate-oscillator)Ultimate Oscillator
+
+Ultimate Oscillator
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import algorithm, SeriesF, indicator, param, plot, color, MutSeriesF
+from indie.algorithms import Sum
+
+
+@algorithm
+def Average(self, bp: SeriesF, tr: SeriesF, length: int) -> float:
+    bp_sum = Sum.new(bp, length)[0]
+    tr_sum = Sum.new(tr, length)[0]
+    res = nan
+    if not isclose(tr_sum, 0):
+        res = bp_sum / tr_sum
+    return res
+
+
+@indicator('UO')  # Ultimate Oscillator
+@param.int('fast_len', default=7, min=1, title='Fast Length')
+@param.int('middle_len', default=14, min=1, title='Middle Length')
+@param.int('slow_len', default=28, min=1, title='Slow Length')
+@plot.line(color=color.RED)
+def Main(self, fast_len, middle_len, slow_len):
+    high = max(self.high[0], self.close[1])
+    low = min(self.low[0], self.close[1])
+    bp = MutSeriesF.new(self.close[0] - low)
+    tr = MutSeriesF.new(high - low)
+    avg7 = Average.new(bp, tr, fast_len)
+    avg14 = Average.new(bp, tr, middle_len)
+    avg28 = Average.new(bp, tr, slow_len)
+    return 100 * (4 * avg7 + 2 * avg14 + avg28) / 7
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#volume-oscillator)Volume Oscillator
+
+Volume Oscillator
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, param, level, color, plot
+from indie.algorithms import Ema
+
+
+@indicator('Volume Osc')  # Volume Oscillator
+@param.int('short_len', default=5, min=1, title='Short Length')
+@param.int('long_len', default=10, min=1, title='Long Length')
+@level(0, line_color=color.GRAY, title='Zero')
+@plot.line(color=color.BLUE, title='VO')
+def Main(self, short_len, long_len):
+    short = Ema.new(self.volume, short_len)[0]
+    long = Ema.new(self.volume, long_len)[0]
+    res = nan
+    if not isclose(long, 0):
+        res = 100 * (short - long) / long
+    return res
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#vortex-indicator)Vortex Indicator
+
+Vortex Indicator
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, format, param, plot, color, MutSeriesF
+from indie.algorithms import Sum, Atr
+
+
+@indicator('VI', format=format.PRICE, precision=4)  # Vortex Indicator
+@param.int('length', default=14, min=2)
+@plot.line(color=color.RED, title='VI -')
+@plot.line(color=color.BLUE, title='VI +')
+def Main(self, length):
+    vmm = Sum.new(MutSeriesF.new(abs(self.low[0] - self.high[1])), length)[0]
+    vmp = Sum.new(MutSeriesF.new(abs(self.high[0] - self.low[1])), length)[0]
+    satr = Sum.new(Atr.new(1), length)[0]
+    vim, vip = nan, nan
+    if not isclose(satr, 0):
+        vim = vmm / satr
+        vip = vmp / satr
+    return vim, vip
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#volume-weighted-average-price)Volume Weighted Average Price
+
+Volume Weighted Average Price
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Vwap
+
+
+@indicator('VWAP', overlay_main_pane=True)  # Volume Weighted Average Price
+@param.source('src', default=source.HLC3, title='Source')
+# TODO: add Earnings, Dividends, Splits
+@param.str('anchor', default='Session', options=['Session', 'Week', 'Month', 'Year'], title='Anchor')
+@param.int('offset', default=0, min=-500, max=500, title='Offset')
+@plot.line('vwap', title='VWAP', color=color.BLUE)
+@plot.line('upper', title='Upper band', color=color.GREEN)
+@plot.line('lower', title='Lower band', color=color.GREEN)
+@plot.fill('upper', 'lower', color=color.GREEN(0.1), title='Background')
+def Main(self, src, anchor, offset):
+    std_dev_mult = 1.0
+    main_line, upper, lower = Vwap.new(src, anchor, std_dev_mult)
+    return (
+        plot.Line(main_line[0], offset=offset),
+        plot.Line(upper[0], offset=offset),
+        plot.Line(lower[0], offset=offset),
+        plot.Fill(offset=offset),
+    )
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#volume-moving-average-weighted)Volume Moving Average Weighted
+
+Volume Moving Average Weighted
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Vwma
+
+
+@indicator('VWMA', overlay_main_pane=True)  # Volume Weighted Moving Average
+@param.int('length', default=20, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@param.int('offset', default=0, min=-500, max=500, title='Offset')
+@plot.line(color=color.BLUE)
+def Main(self, length, src, offset):
+    result = Vwma.new(src, length)
+    return plot.Line(result[0], offset=offset)
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#williams-alligator)Williams Alligator
+
+Williams Alligator
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, plot, color
+from indie.algorithms import Rma
+
+
+@indicator('Alligator', overlay_main_pane=True)  # Williams Alligator
+@param.int('jaw_period', default=13, min=1, title='Jaw Period')
+@param.int('teeth_period', default=8, min=1, title='Teeth Period')
+@param.int('lips_period', default=5, min=1, title='Lips Period')
+@param.int('jaw_offset', default=8, min=1, title='Jaw Offset')
+@param.int('teeth_offset', default=5, min=1, title='Teeth Offset')
+@param.int('lips_offset', default=3, min=1, title='Lips Offset')
+@plot.line(color=color.BLUE, title='Jaw')
+@plot.line(color=color.RED, title='Teeth')
+@plot.line(color=color.GREEN, title='Lips')
+def Main(self, jaw_period, teeth_period, lips_period, jaw_offset, teeth_offset, lips_offset):
+    jaw = Rma.new(self.hl2, jaw_period)
+    teeth = Rma.new(self.hl2, teeth_period)
+    lips = Rma.new(self.hl2, lips_period)
+
+    return (
+        plot.Line(jaw[0], offset=jaw_offset),
+        plot.Line(teeth[0], offset=teeth_offset),
+        plot.Line(lips[0], offset=lips_offset),
+    )
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#williams-percent-range)Williams Percent Range
+
+Williams Percent Range
+
+
+```
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, param, source, band, color, level, line_style, plot
+from indie.algorithms import Highest, Lowest
+
+
+@indicator('Williams %R')  # Williams Percent Range
+@param.int('length', default=14, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@band(-20, -80, line_color=color.GRAY, fill_color=color.PURPLE(0.1), title='Background')
+@level(-50, line_color=color.GRAY, line_style=line_style.DOTTED, title='Middle Level')
+@plot.line(color=color.PURPLE, title='%R')
+def Main(self, length, src):
+    max = Highest.new(self.high, length)[0]
+    min = Lowest.new(self.low, length)[0]
+    res = nan
+    if not isclose(max - min, 0):
+        res = 100 * (src[0] - max) / (max - min)
+    return res
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#moving-average-weighted)Moving Average Weighted
+
+Moving Average Weighted
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, source, plot, color
+from indie.algorithms import Wma
+
+
+@indicator('WMA', overlay_main_pane=True)  # Weighted Moving Average
+@param.int('length', default=9, min=1)
+@param.source('src', default=source.CLOSE, title='Source')
+@param.int('offset', default=0, min=-500, max=500, title='Offset')
+@plot.line(color=color.BLUE)
+def Main(self, length, src, offset):
+    result = Wma.new(src, length)
+    return plot.Line(result[0], offset=offset)
+```
+
+## [​](https://takeprofit.com/docs/indie/Code-examples/built-in-indicators#woodies-cci)Woodies CCI
+
+Woodies CCI
+
+
+```
+# indie:lang_version = 5
+from indie import indicator, param, level, color, line_style, plot, Color
+from indie.algorithms import Cci
+
+
+@indicator('Woodies CCI')
+@param.int('cci_turbo_len', default=6, min=3, max=14, title='CCI Turbo Length')
+@param.int('cci_14_len', default=14, min=7, max=20, title='CCI 14 Length')
+@level(-100, line_color=color.GRAY, line_style=line_style.DOTTED, title='Minus Line')
+@level(0, line_color=color.GRAY, line_style=line_style.SOLID, title='Zero Line')
+@level(100, line_color=color.GRAY, line_style=line_style.DOTTED, title='Hundred Line')
+@plot.histogram(title='CCI Turbo Histogram')
+@plot.line(color=color.GREEN, title='CCI Turbo')
+@plot.line(color=color.RED, title='CCI 14')
+def Main(self, cci_turbo_len, cci_14_len):
+    cci_turbo = Cci.new(self.close, cci_turbo_len)
+    cci_14 = Cci.new(self.close, cci_14_len)
+    last_5_down = cci_14[5] < 0 and cci_14[4] < 0 and cci_14[3] < 0 and cci_14[2] < 0 and cci_14[1] < 0
+    last_5_up = cci_14[5] > 0 and cci_14[4] > 0 and cci_14[3] > 0 and cci_14[2] > 0 and cci_14[1] > 0
+
+    hist_color: Color
+    if last_5_up:
+        hist_color = color.GREEN
+    elif last_5_down:
+        hist_color = color.RED
+    elif cci_14[0] < 0:
+        hist_color = color.GREEN
+    else:
+        hist_color = color.RED
+    return plot.Histogram(cci_14[0], color=hist_color), cci_turbo[0], cci_14[0]
+```

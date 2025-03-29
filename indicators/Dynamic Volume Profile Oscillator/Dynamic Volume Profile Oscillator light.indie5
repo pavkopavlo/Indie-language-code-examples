@@ -1,0 +1,91 @@
+# indie:lang_version = 5
+from math import nan, isclose
+from indie import indicator, param, plot, color, MutSeriesF, source, MainContext
+from indie.algorithms import Sma, Ema, StdDev, Lowest, Highest
+
+# === Indicator Declaration & Inputs ===
+@indicator("Dynamic Volume Profile Oscillator lite", overlay_main_pane=False)
+@param.source("price_src", default=source.CLOSE, title="Price Source")
+@param.int("lookback", default=50, min=10, title="Lookback Period")
+@param.int("smoothing", default=5, min=1, max=50, title="Smoothing Length")
+@param.float("sensitivity", default=1.0, min=0.1, max=5.0, step=0.1, title="Sensitivity")
+@param.bool("mean_reversion", default=True, title="Mean Reversion Mode")
+@param.bool("use_adaptive_midline", default=True, title="Use Adaptive Midline")
+@param.int("midline_period", default=50, min=10, max=200, title="Adaptive Midline Period")
+@param.float("zone_width", default=1.5, min=0.5, max=3.0, step=0.1, title="Zone Width Multiplier")
+
+# Plot base + zones with 6-level gradient
+@plot.line('osc', color=color.AQUA, title="Oscillator")
+@plot.line('fast_signal', color=color.FUCHSIA, title="Fast Signal")
+@plot.line('slow_signal', color=color.SILVER, title="Slow Signal")
+@plot.line('midline', color=color.WHITE(0.4), title="Adaptive Midline")
+
+@plot.line('upper_zone1', color=color.FUCHSIA(0.15), title="Upper Zone 1")
+@plot.line('upper_zone2', color=color.FUCHSIA(0.25), title="Upper Zone 2")
+@plot.line('upper_zone3', color=color.FUCHSIA(0.5), title="Upper Zone 3")
+@plot.line('upper_zone4', color=color.FUCHSIA(0.65), title="Upper Zone 4")
+@plot.line('upper_zone5', color=color.FUCHSIA(0.85), title="Upper Zone 5")
+@plot.line('upper_zone6', color=color.FUCHSIA(1.0), title="Upper Zone 6")
+
+@plot.line('lower_zone1', color=color.AQUA(0.15), title="Lower Zone 1")
+@plot.line('lower_zone2', color=color.AQUA(0.25), title="Lower Zone 2")
+@plot.line('lower_zone3', color=color.AQUA(0.5), title="Lower Zone 3")
+@plot.line('lower_zone4', color=color.AQUA(0.65), title="Lower Zone 4")
+@plot.line('lower_zone5', color=color.AQUA(0.85), title="Lower Zone 5")
+@plot.line('lower_zone6', color=color.AQUA(1.0), title="Lower Zone 6")
+
+class Main(MainContext):
+    def calc(self, price_src, lookback, smoothing, sensitivity, mean_reversion,
+             use_adaptive_midline, midline_period, zone_width):
+
+        vwap_sum = 0.0
+        volume_sum = 0.0
+        for i in range(lookback):
+            vwap_sum += price_src[i] * self.volume[i]
+            volume_sum += self.volume[i]
+        vwap_level = vwap_sum / volume_sum if not isclose(volume_sum, 0) else price_src[0]
+
+        price_dev = 0.0
+        for i in range(lookback):
+            price_dev += abs(price_src[i] - vwap_level) * (self.volume[i] / volume_sum) if not isclose(volume_sum, 0) else 0
+
+        osc_raw = 50.0
+        if mean_reversion:
+            if not isclose(price_dev * sensitivity, 0):
+                osc_raw = 50 + ((price_src[0] - vwap_level) / (price_dev * sensitivity)) * 25
+        else:
+            sma_vol = Sma.new(self.volume, smoothing)
+            min_vol = Lowest.new(sma_vol, lookback)[0]
+            max_vol = Highest.new(sma_vol, lookback)[0]
+            vol_range = max_vol - min_vol
+            if not isclose(vol_range, 0):
+                vol_position = (sma_vol[0] - min_vol) / vol_range
+                osc_raw = min(100, max(0, vol_position * 100))
+
+        osc_series = MutSeriesF.new(osc_raw)
+        osc = Ema.new(osc_series, smoothing)[0]
+        fast_signal = Ema.new(osc_series, 5)[0]
+        slow_signal = Ema.new(osc_series, 15)[0]
+
+        midline_series = MutSeriesF.new(osc)
+        midline = Sma.new(midline_series, midline_period)[0] if use_adaptive_midline else 50.0
+        stdev = StdDev.new(midline_series, midline_period)[0] * zone_width
+
+        # Build zone levels
+        upper_zones: list[float] = [0.0] * 6
+        lower_zones: list[float] = [0.0] * 6
+        for i in range(6):
+            scale = 1 - i * 0.15
+            upper_zones[i] = midline + stdev * scale
+            lower_zones[i] = midline - stdev * scale
+
+        return (
+            osc,
+            fast_signal,
+            slow_signal,
+            midline,
+            upper_zones[0], upper_zones[1], upper_zones[2],
+            upper_zones[3], upper_zones[4], upper_zones[5],
+            lower_zones[0], lower_zones[1], lower_zones[2],
+            lower_zones[3], lower_zones[4], lower_zones[5],
+        )

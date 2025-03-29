@@ -1,0 +1,36 @@
+# indie:lang_version = 5
+from indie import indicator, param, plot, color, source, MainContext
+from indie.algorithms import StdDev, Ema
+
+@indicator("StdDev Volatility Indicator")
+@param.int("length", default=20, min=1, title="StdDev Period")
+@param.int("smooth_length", default=10, min=1, title="Smoothing Period")
+@param.float("threshold_high", default=2.0, title="High Volatility Threshold")
+@param.float("threshold_medium", default=1.0, title="Medium Volatility Threshold")
+@param.source("source", default=source.CLOSE, title="Price Source")
+@plot.line(title="StdDev", color=color.BLUE)
+@plot.line(title="Smoothed StdDev", color=color.RED)
+@plot.line(title="High Threshold", color=color.RED(0.5))
+@plot.line(title="Medium Threshold", color=color.YELLOW(0.5))
+class Main(MainContext):
+    def calc(self, length, smooth_length, threshold_high, threshold_medium, source):
+        # Calculate standard deviation
+        stddev = StdDev.new(source, length)
+        
+        # Calculate smoothed standard deviation
+        smoothed_stddev = Ema.new(stddev, smooth_length)
+        
+        # Calculate average value to normalize thresholds
+        avg_stddev = Ema.new(stddev, length * 3)[0]
+        
+        # Dynamic thresholds based on average volatility
+        high_threshold = avg_stddev * threshold_high
+        medium_threshold = avg_stddev * threshold_medium
+        
+        # Return all values for plotting
+        return (
+            stddev[0],          # Raw standard deviation
+            smoothed_stddev[0], # Smoothed standard deviation
+            high_threshold,     # High volatility threshold line
+            medium_threshold    # Medium volatility threshold line
+        )

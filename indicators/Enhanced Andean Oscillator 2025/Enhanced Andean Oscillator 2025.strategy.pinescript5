@@ -1,0 +1,101 @@
+//@version=5
+strategy("Enhanced Andean Oscillator 2025 Strategy", overlay=false, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === INPUTS ===
+length         = input.int(25, "Base Length", minval=1)
+signalLength   = input.int(9, "Signal Smoothing Length", minval=1)
+htf            = input.timeframe("60", "Higher Timeframe")
+deadZone       = input.float(0.05, "Dead Zone Threshold", minval=0)
+atrLength      = input.int(14, "ATR Length", minval=1)
+volumeLength   = input.int(20, "Volume Lookback", minval=1)
+slopeLookback  = input.int(2, "Slope Confirmation Bars", minval=1)
+
+// === UTILITY FUNCTIONS ===
+adaptive_alpha(baseLen, atrCurrent, atrRef) =>
+    alpha = 2 / (baseLen + 1)
+    volRatio = atrCurrent / atrRef
+    math.max(math.min(alpha * volRatio, 1), 0.001)
+
+ema_custom(src, len) =>
+    alpha = 2 / (len + 1)
+    ema = 0.0
+    ema := na(ema[1]) ? src : ema[1] + alpha * (src - ema[1])
+
+// === ATR and Volume Context ===
+atr_now = ta.atr(atrLength)
+atr_ref = ta.sma(atr_now, atrLength)
+alpha = adaptive_alpha(length, atr_now, atr_ref)
+
+vol = volume
+avgVol = ta.sma(vol, volumeLength)
+volFactor = vol / avgVol
+
+// === MAIN ENVELOPES ===
+var float up1 = na
+var float dn1 = na
+var float up2 = na
+var float dn2 = na
+
+c = close
+o = open
+c2 = c * c
+o2 = o * o
+
+up1 := na(up1[1]) ? c : math.max(c, o, up1[1] - alpha * (up1[1] - c))
+dn1 := na(dn1[1]) ? c : math.min(c, o, dn1[1] + alpha * (c - dn1[1]))
+up2 := na(up2[1]) ? c2 : math.max(c2, o2, up2[1] - alpha * (up2[1] - c2))
+dn2 := na(dn2[1]) ? c2 : math.min(c2, o2, dn2[1] + alpha * (c2 - dn2[1]))
+
+bull = math.sqrt(math.max(dn2 - dn1 * dn1, 0)) * volFactor
+bear = math.sqrt(math.max(up2 - up1 * up1, 0)) * volFactor
+
+// === DOUBLE SMOOTHED SIGNAL ===
+signal1 = ta.ema(math.max(bull, bear), signalLength)
+signal  = ta.ema(signal1, signalLength)
+
+// === DEAD ZONE FILTER ===
+diff = bull - bear
+inDeadZone = math.abs(diff) < deadZone
+
+// === SLOPE CONFIRMATION ===
+slopeBull = bull - bull[slopeLookback]
+slopeBear = bear - bear[slopeLookback]
+validSlope = slopeBull > 0 and slopeBear < 0
+
+// === HIGHER TIMEFRAME FILTER ===
+bull_htf = request.security(syminfo.tickerid, htf, bull)
+bear_htf = request.security(syminfo.tickerid, htf, bear)
+htf_ok = bull_htf > bear_htf
+
+// === ENTRY CONDITIONS ===
+longCond  = bull > bear + deadZone and not inDeadZone and validSlope and htf_ok
+shortCond = bear > bull + deadZone and not inDeadZone and slopeBear > 0 and slopeBull < 0 and not htf_ok
+
+// === EXIT CONDITIONS ===
+exitLong  = bull < signal
+exitShort = bear < signal
+
+// === STRATEGY LOGIC ===
+if (longCond)
+    strategy.entry("Long", strategy.long)
+if (exitLong)
+    strategy.close("Long")
+
+if (shortCond)
+    strategy.entry("Short", strategy.short)
+if (exitShort)
+    strategy.close("Short")
+
+// === PLOTTING ===
+plot(bull, "Bullish", color=color.green, linewidth=2)
+plot(bear, "Bearish", color=color.red, linewidth=2)
+plot(signal, "Signal", color=color.orange)
+
+bgcolor(longCond ? color.new(color.green, 85) : na)
+bgcolor(shortCond ? color.new(color.red, 85) : na)
+
+// === ALERTS ===
+alertcondition(longCond, title="Long Entry", message="Enhanced Andean: Long Entry Signal")
+alertcondition(shortCond, title="Short Entry", message="Enhanced Andean: Short Entry Signal")
+alertcondition(exitLong, title="Exit Long", message="Enhanced Andean: Exit Long")
+alertcondition(exitShort, title="Exit Short", message="Enhanced Andean: Exit Short")

@@ -1,0 +1,54 @@
+# indie:lang_version = 5
+#This indicator displays higher timeframe candle ranges on your current chart, making it easy to identify key support and resistance levels from larger timeframes.
+#=====Overview=====
+#Indicator shows the high and low of each candle from your selected higher timeframe, with color-coding to instantly identify bullish or bearish price action.
+#=====Features=====
+#Color-Coded Visualization: Green for bullish candles, red for bearish candles
+#Transparent Fill: Highlights the entire price range of the higher timeframe candle
+#Moving Average Reference: Shows a moving average on your current timeframe for context
+from indie import indicator, param, plot, color, MainContext, sec_context
+from indie.algorithms import Sma
+
+@sec_context
+def SimpleHigherTimeframeData(self):
+    # We only need high/low range and direction
+    is_bullish = self.close[0] >= self.open[0]
+    direction = 1.0 if is_bullish else 0.0
+    
+    # Return the high, low and direction
+    return self.high[0], self.low[0], direction
+
+@indicator('Multi-timeframe with candles visualisation demo', overlay_main_pane=True)
+@param.time_frame('higher_tf', default='1D', title='Higher Timeframe')
+@param.int('ma_length', default=20, min=1, title='MA Length')
+@param.float('fill_opacity', default=0.15, min=0.05, max=0.5, title='Fill Opacity')
+@plot.line('htf_high', title='HTF High')
+@plot.line('htf_low', title='HTF Low')
+@plot.fill('htf_high', 'htf_low', title='HTF Candle Range')
+@plot.line(color=color.YELLOW, title='Current TF MA')
+class Main(MainContext):
+    def __init__(self, higher_tf):
+        # Get minimal data from higher timeframe
+        self._htf_high, self._htf_low, self._htf_direction = self.calc_on(
+            sec_context=SimpleHigherTimeframeData,
+            time_frame=higher_tf
+        )
+    
+    def calc(self, ma_length, fill_opacity):
+        # Determine colors based on direction
+        is_bullish = self._htf_direction[0] > 0.5
+        level_color = color.GREEN if is_bullish else color.RED
+        
+        # Set fill color with custom opacity
+        fill_color = color.GREEN(fill_opacity) if is_bullish else color.RED(fill_opacity)
+        
+        # Calculate current timeframe MA
+        current_ma = Sma.new(self.close, ma_length)[0]
+        
+        # Return simplified visualization with fill
+        return (
+            plot.Line(self._htf_high[0], color=level_color),
+            plot.Line(self._htf_low[0], color=level_color),
+            plot.Fill(color=fill_color),
+            current_ma
+        )

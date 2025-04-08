@@ -1,0 +1,70 @@
+# indie:lang_version = 5
+from math import sqrt
+from indie import indicator, param, color, plot, MutSeriesF, MainContext, TimeFrame
+from indie.algorithms import Atr, Sma, Ema
+from indie.plot import line
+from indie import sec_context, param_ref
+
+@sec_context
+@param_ref('length')
+def HigherTimeframeBull(self, length):
+    return self.close[0]
+
+@sec_context
+@param_ref('length')
+def HigherTimeframeBear(self, length):
+    return self.open[0]
+
+@indicator("Enhanced Andean Oscillator 2025 (HTF Final)", overlay_main_pane=False)
+@param.int("length", default=25, min=1, title="Base Length")
+@param.int("signalLength", default=9, min=1, title="Signal Smoothing Length")
+@param.str("htf", default="60m", title="Higher Timeframe")
+@param.float("deadZone", default=0.05, min=0.0, title="Dead Zone Threshold")
+@param.int("atrLength", default=14, min=1, title="ATR Length")
+@param.int("volumeLength", default=20, min=1, title="Volume Lookback")
+@param.int("slopeLookback", default=2, min=1, title="Slope Confirmation Bars")
+@plot.line(title="Bullish", color=color.GREEN)
+@plot.line(title="Bearish", color=color.RED)
+@plot.line(title="Signal", color=color.YELLOW)
+class Main(MainContext):
+    def __init__(self, htf):
+        self.htf_tf = TimeFrame.from_str(htf)
+        self.bull_htf_series = self.calc_on(HigherTimeframeBull, time_frame=self.htf_tf)
+        self.bear_htf_series = self.calc_on(HigherTimeframeBear, time_frame=self.htf_tf)
+
+    def calc(self, length, signalLength, htf, deadZone, atrLength, volumeLength, slopeLookback):
+        atr_now = Atr.new(atrLength)[0]
+        atr_ref = Sma.new(Atr.new(atrLength), atrLength)[0]
+        alpha = 2 / (length + 1)
+        volRatio = atr_now / atr_ref
+        alpha = max(min(alpha * volRatio, 1), 0.001)
+
+        vol = self.volume[0]
+        avgVol = Sma.new(self.volume, volumeLength)[0]
+        volFactor = vol / avgVol if avgVol != 0 else 1.0
+
+        up1 = MutSeriesF.new(init=self.close[0])
+        dn1 = MutSeriesF.new(init=self.close[0])
+        up2 = MutSeriesF.new(init=self.close[0] ** 2)
+        dn2 = MutSeriesF.new(init=self.close[0] ** 2)
+
+        c = self.close[0]
+        o = self.open[0]
+        c2 = c * c
+        o2 = o * o
+
+        up1[0] = max(c, o, up1[1] - alpha * (up1[1] - c))
+        dn1[0] = min(c, o, dn1[1] + alpha * (c - dn1[1]))
+        up2[0] = max(c2, o2, up2[1] - alpha * (up2[1] - c2))
+        dn2[0] = min(c2, o2, dn2[1] + alpha * (c2 - dn2[1]))
+
+        bull = sqrt(max(dn2[0] - dn1[0] * dn1[0], 0)) * volFactor
+        bear = sqrt(max(up2[0] - up1[0] * up1[0], 0)) * volFactor
+
+        max_val = max(bull, bear)
+        signal1 = Ema.new(MutSeriesF.new(max_val), signalLength)[0]
+        signal = Ema.new(MutSeriesF.new(signal1), signalLength)[0]
+
+        htf_ok = self.bull_htf_series[0] > self.bear_htf_series[0]
+
+        return bull, bear, signal

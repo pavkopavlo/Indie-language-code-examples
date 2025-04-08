@@ -1,0 +1,127 @@
+# indie:lang_version = 5
+from math import sqrt, isnan
+from indie import (
+    indicator, param, color, Color, plot,
+    MainContext, MutSeriesF, TimeFrame, Optional, sec_context, param_ref
+)
+from indie.algorithms import Atr, Sma, Ema
+from indie.plot import Background
+
+@sec_context
+@param_ref('length')
+@param_ref('atrLength')
+@param_ref('volumeLength')
+def AndeanHTF(self, length, atrLength, volumeLength):
+    atr_series = Atr.new(atrLength)
+    atr_now = atr_series[0]
+    atr_ref = Sma.new(atr_series, atrLength)[0]
+    alpha = 2 / (length + 1)
+    alpha = max(min(alpha * (atr_now / atr_ref), 1), 0.001)
+
+    vol = self.volume[0]
+    avgVol = Sma.new(self.volume, volumeLength)[0]
+    volFactor = vol / avgVol if avgVol != 0 else 1.0
+
+    c = self.close[0]
+    o = self.open[0]
+    c2 = c * c
+    o2 = o * o
+
+    up1 = MutSeriesF.new(c)
+    dn1 = MutSeriesF.new(c)
+    up2 = MutSeriesF.new(c2)
+    dn2 = MutSeriesF.new(c2)
+
+    up1[0] = max(c, o, up1[1] - alpha * (up1[1] - c)) if not isnan(up1[1]) else c
+    dn1[0] = min(c, o, dn1[1] + alpha * (c - dn1[1])) if not isnan(dn1[1]) else c
+    up2[0] = max(c2, o2, up2[1] - alpha * (up2[1] - c2)) if not isnan(up2[1]) else c2
+    dn2[0] = min(c2, o2, dn2[1] + alpha * (c2 - dn2[1])) if not isnan(dn2[1]) else c2
+
+    bull = sqrt(max(dn2[0] - dn1[0] * dn1[0], 0)) * volFactor
+    bear = sqrt(max(up2[0] - up1[0] * up1[0], 0)) * volFactor
+    return bull, bear
+
+@indicator("Enhanced Andean Oscillator 2025", overlay_main_pane=False)
+@param.int('length', default=25, min=1, title='Base Length')
+@param.int('signalLength', default=9, min=1, title='Signal Smoothing Length')
+@param.str('htf', default='60m', title='Higher Timeframe')
+@param.float('deadZone', default=0.05, min=0.0, title='Dead Zone Threshold')
+@param.int('atrLength', default=14, min=1, title='ATR Length')
+@param.int('volumeLength', default=20, min=1, title='Volume Lookback')
+@param.int('slopeLookback', default=2, min=1, title='Slope Confirmation Bars')
+@plot.line(title='Bullish', color=color.GREEN, line_width=2)
+@plot.line(title='Bearish', color=color.RED, line_width=2)
+@plot.line(title='Signal', color=color.YELLOW)
+#@plot.background()
+class Main(MainContext):
+    def __init__(self, htf):
+        self.htf = TimeFrame.from_str(htf)
+        self.bull_htf, self.bear_htf = self.calc_on(AndeanHTF, time_frame=self.htf)
+        self.initialized = False
+
+        self.up1: Optional[MutSeriesF] = None
+        self.dn1: Optional[MutSeriesF] = None
+        self.up2: Optional[MutSeriesF] = None
+        self.dn2: Optional[MutSeriesF] = None
+        self.bullSeries: Optional[MutSeriesF] = None
+        self.bearSeries: Optional[MutSeriesF] = None
+
+    def calc(self, length, signalLength, htf, deadZone, atrLength, volumeLength, slopeLookback):
+        if not self.initialized:
+            self.up1 = MutSeriesF.new(0.0)
+            self.dn1 = MutSeriesF.new(0.0)
+            self.up2 = MutSeriesF.new(0.0)
+            self.dn2 = MutSeriesF.new(0.0)
+            self.bullSeries = MutSeriesF.new(0.0)
+            self.bearSeries = MutSeriesF.new(0.0)
+            self.initialized = True
+
+        atr_series = Atr.new(atrLength)
+        atr_now = atr_series[0]
+        atr_ref = Sma.new(atr_series, atrLength)[0]
+        alpha = 2 / (length + 1)
+        alpha = max(min(alpha * (atr_now / atr_ref), 1), 0.001)
+
+        vol = self.volume[0]
+        avgVol = Sma.new(self.volume, volumeLength)[0]
+        volFactor = vol / avgVol if avgVol != 0 else 1.0
+
+        c = self.close[0]
+        o = self.open[0]
+        c2 = c * c
+        o2 = o * o
+
+        self.up1.value()[0] = max(c, o, self.up1.value()[1] - alpha * (self.up1.value()[1] - c)) if not isnan(self.up1.value()[1]) else c
+        self.dn1.value()[0] = min(c, o, self.dn1.value()[1] + alpha * (c - self.dn1.value()[1])) if not isnan(self.dn1.value()[1]) else c
+        self.up2.value()[0] = max(c2, o2, self.up2.value()[1] - alpha * (self.up2.value()[1] - c2)) if not isnan(self.up2.value()[1]) else c2
+        self.dn2.value()[0] = min(c2, o2, self.dn2.value()[1] + alpha * (c2 - self.dn2.value()[1])) if not isnan(self.dn2.value()[1]) else c2
+
+        bull = sqrt(max(self.dn2.value()[0] - self.dn1.value()[0] * self.dn1.value()[0], 0)) * volFactor
+        bear = sqrt(max(self.up2.value()[0] - self.up1.value()[0] * self.up1.value()[0], 0)) * volFactor
+
+        self.bullSeries.value()[0] = bull
+        self.bearSeries.value()[0] = bear
+
+        signal1 = Ema.new(MutSeriesF.new(max(bull, bear)), signalLength)[0]
+        signal = Ema.new(MutSeriesF.new(signal1), signalLength)[0]
+
+        # === Возвращаем всю торговую логику ===
+        diff = bull - bear
+        inDeadZone = abs(diff) < deadZone
+
+        slopeBull = bull - self.bullSeries.value()[slopeLookback]
+        slopeBear = bear - self.bearSeries.value()[slopeLookback]
+        validSlope = slopeBull > 0 and slopeBear < 0
+
+        htf_ok = self.bull_htf[0] > self.bear_htf[0]
+
+        longCond = bull > bear + deadZone and not inDeadZone and validSlope and htf_ok
+        shortCond = bear > bull + deadZone and not inDeadZone and slopeBear > 0 and slopeBull < 0 and not htf_ok
+
+        # === Возвращаем переменную bg ===
+        bg_color: Optional[Color] = None
+        if longCond:
+            bg = color.GREEN(0.85)
+        elif shortCond:
+            bg = color.RED(0.85)
+        return bull, bear, signal

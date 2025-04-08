@@ -1,0 +1,148 @@
+# indie:lang_version = 5
+#valid code but broken logic
+import math
+from indie import indicator, param, plot, color, MutSeriesF, level, algorithm, SeriesF
+from indie.algorithms import Atr, Sma, Ema
+from indie import MainContext, sec_context, param_ref
+
+# Utility function
+@algorithm
+def AdaptiveAlpha(self, baseLen: int, atrCurrent: float, atrRef: float) -> float:
+    alpha = 2 / (baseLen + 1)
+    volRatio = atrCurrent / atrRef if atrRef != 0 else 1
+    return max(min(alpha * volRatio, 1), 0.001)
+
+@algorithm
+def EmaCustom(self, src: SeriesF, len: int) -> SeriesF:
+    alpha = 2 / (len + 1)
+    ema = MutSeriesF.new(0.0)
+    if math.isnan(ema[1]):
+        ema[0] = src[0]
+    else:
+        ema[0] = ema[1] + alpha * (src[0] - ema[1])
+    return ema
+
+@sec_context
+@param_ref('length')
+@param_ref('signalLength')
+@param_ref('atrLength')
+@param_ref('volumeLength')
+def HTFContext(self, length, signalLength, atrLength, volumeLength):
+    # Calculate bull and bear the same way as in the main context
+    atr_now = Atr.new(atrLength)[0]
+    atr_ref = Sma.new(MutSeriesF.new(atr_now), atrLength)[0]
+    alpha = AdaptiveAlpha.new(length, atr_now, atr_ref)
+    
+    vol = self.volume[0]
+    avgVol = Sma.new(self.volume, volumeLength)[0]
+    volFactor = vol / avgVol if avgVol != 0 else 1
+    
+    # Initialize mutable series for state
+    up1 = MutSeriesF.new(self.close[0])
+    dn1 = MutSeriesF.new(self.close[0])
+    up2 = MutSeriesF.new(self.close[0] * self.close[0])
+    dn2 = MutSeriesF.new(self.close[0] * self.close[0])
+    
+    c = self.close[0]
+    o = self.open[0]
+    c2 = c * c
+    o2 = o * o
+    
+    if not math.isnan(up1[1]):
+        up1[0] = max(c, o, up1[1] - alpha * (up1[1] - c))
+    
+    if not math.isnan(dn1[1]):
+        dn1[0] = min(c, o, dn1[1] + alpha * (c - dn1[1]))
+    
+    if not math.isnan(up2[1]):
+        up2[0] = max(c2, o2, up2[1] - alpha * (up2[1] - c2))
+    
+    if not math.isnan(dn2[1]):
+        dn2[0] = min(c2, o2, dn2[1] + alpha * (c2 - dn2[1]))
+    
+    bull = math.sqrt(max(dn2[0] - dn1[0] * dn1[0], 0)) * volFactor
+    bear = math.sqrt(max(up2[0] - up1[0] * up1[0], 0)) * volFactor
+    
+    return bull, bear
+
+@indicator("Enhanced Andean Oscillator 2025")
+@param.int('length', default=25, min=1, title="Base Length")
+@param.int('signalLength', default=9, min=1, title="Signal Smoothing Length")
+@param.time_frame('htf', default='1h', options=['1m', '3m', '5m', '15m', '30m', '45m', '1h', '2h', '3h', '4h', '1D', '1W', '1M'], title="Higher Timeframe")
+@param.float('deadZone', default=0.05, min=0, title="Dead Zone Threshold")
+@param.int('atrLength', default=14, min=1, title="ATR Length")
+@param.int('volumeLength', default=20, min=1, title="Volume Lookback")
+@param.int('slopeLookback', default=2, min=1, title="Slope Confirmation Bars")
+@plot.line(color=color.GREEN, line_width=2, title="Bullish")
+@plot.line(color=color.RED, line_width=2, title="Bearish")
+@plot.line(color=color.YELLOW, title="Signal") 
+class Main(MainContext):
+    def __init__(self, htf):
+        self.bull_htf, self.bear_htf = self.calc_on(HTFContext, time_frame=htf)
+        # Store initial state in class fields instead of using Var
+        self._up1_value = self.close[0]
+        self._dn1_value = self.close[0]
+        self._up2_value = self.close[0] * self.close[0]
+        self._dn2_value = self.close[0] * self.close[0]
+    
+    def calc(self, length, signalLength, deadZone, atrLength, volumeLength, slopeLookback):
+        # === ATR and Volume Context ===
+        atr_now = Atr.new(atrLength)[0]
+        atr_ref = Sma.new(MutSeriesF.new(atr_now), atrLength)[0]
+        alpha = AdaptiveAlpha.new(length, atr_now, atr_ref)
+        
+        vol = self.volume[0]
+        avgVol = Sma.new(self.volume, volumeLength)[0]
+        volFactor = vol / avgVol if avgVol != 0 else 1
+        
+        # === MAIN ENVELOPES ===
+        c = self.close[0]
+        o = self.open[0]
+        c2 = c * c
+        o2 = o * o
+        
+        # Use mutable series to track state instead of Var
+        up1 = MutSeriesF.new(self._up1_value)
+        dn1 = MutSeriesF.new(self._dn1_value)
+        up2 = MutSeriesF.new(self._up2_value)
+        dn2 = MutSeriesF.new(self._dn2_value)
+        
+        up1[0] = max(c, o, up1[0] - alpha * (up1[0] - c))
+        dn1[0] = min(c, o, dn1[0] + alpha * (c - dn1[0]))
+        up2[0] = max(c2, o2, up2[0] - alpha * (up2[0] - c2))
+        dn2[0] = min(c2, o2, dn2[0] + alpha * (c2 - dn2[0]))
+        
+        # Update state for next call
+        self._up1_value = up1[0]
+        self._dn1_value = dn1[0]
+        self._up2_value = up2[0]
+        self._dn2_value = dn2[0]
+        
+        bull = MutSeriesF.new(math.sqrt(max(dn2[0] - dn1[0] * dn1[0], 0)) * volFactor)
+        bear = MutSeriesF.new(math.sqrt(max(up2[0] - up1[0] * up1[0], 0)) * volFactor)
+        
+        # === DOUBLE SMOOTHED SIGNAL ===
+        signal1 = Ema.new(MutSeriesF.new(max(bull[0], bear[0])), signalLength)
+        signal = Ema.new(signal1, signalLength)
+        
+        # === DEAD ZONE FILTER ===
+        diff = bull[0] - bear[0]
+        inDeadZone = abs(diff) < deadZone
+        
+        # === SLOPE CONFIRMATION ===
+        slopeBull = bull[0] - bull[slopeLookback]
+        slopeBear = bear[0] - bear[slopeLookback]
+        validSlope = slopeBull > 0 and slopeBear < 0
+        
+        # === HIGHER TIMEFRAME FILTER ===
+        htf_ok = self.bull_htf[0] > self.bear_htf[0]
+        
+        # === ENTRY CONDITIONS ===
+        longCond = bull[0] > bear[0] + deadZone and not inDeadZone and validSlope and htf_ok
+        shortCond = bear[0] > bull[0] + deadZone and not inDeadZone and slopeBear > 0 and slopeBull < 0 and not htf_ok
+        
+        # === EXIT CONDITIONS ===
+        exitLong = bull[0] < signal[0]
+        exitShort = bear[0] < signal[0]
+        
+        return bull[0], bear[0], signal[0]

@@ -1,3 +1,27 @@
+# Copyright (c) 2025 @pavelmedd https://takeprofit.com/@pavelmedd. All rights reserved.
+# This work is licensed under the MIT License.
+# For a copy, see <https://opensource.org/licenses/MIT>.
+# This indicator is inspired by Andean Oscillator created by Alex Pierrefeu - 100% reingenered to new indicator
+
+# indie:lang_version = 5
+from math import sin, pi, nan
+from indie import indicator, plot, color
+from indie.plot import MarkerDisplayOptions
+
+@indicator('Markers', overlay_main_pane=True)
+@plot.marker(style=plot.marker_style.CROSS)
+@plot.marker(style=plot.marker_style.CIRCLE, color=color.AQUA)
+@plot.marker(style=plot.marker_style.LABEL, size=7)
+def Main(self):
+    r = int(255 * abs(sin(self.bar_index / 10 + 0)))
+    g = int(255 * abs(sin(self.bar_index / 10 + 0.5)))
+    b = int(255 * abs(sin(self.bar_index / 10 + 2)))
+    return (
+        plot.Marker(self.close[0] + 10000, color=color.rgba(r, g, b)),
+        sin(self.bar_index / 5) * 5000 + 80000 if self.bar_index % 3 == 0 else nan,
+        plot.Marker(self.close[0] + 10000 if self.bar_index % 20 == 0 else nan, text='WOW'),
+    )
+
 # indie:lang_version = 5
 from math import sqrt, isnan, nan
 from indie import (
@@ -7,17 +31,22 @@ from indie import (
 from indie.algorithms import Atr, Sma, Ema
 from indie.plot import marker_style, marker_position
 
+# === HTF CONTEXT ===
+# This context calculates Bull/Bear strength on a higher timeframe (HTF)
+# It uses the same recursive envelope logic as the main context
 @param_ref('length')
 @param_ref('atrLength')
 @param_ref('volumeLength')
 class AndeanHTFContext(SecContext):
     def __init__(self):
+        # Persistent stateful series for recursive envelope tracking
         self.up1_htf = self.new_mut_series_f(self.close[0])
         self.dn1_htf = self.new_mut_series_f(self.close[0])
         self.up2_htf = self.new_mut_series_f(self.close[0] ** 2)
         self.dn2_htf = self.new_mut_series_f(self.close[0] ** 2)
 
     def calc(self, length: int, atrLength: int, volumeLength: int) -> tuple[float, float]:
+        # Adaptive alpha based on ATR ratio
         atr_series = Atr.new(atrLength)
         atr_now = atr_series[0]
         atr_ref = Sma.new(atr_series, atrLength)[0]
@@ -28,20 +57,24 @@ class AndeanHTFContext(SecContext):
         avgVol = Sma.new(self.volume, volumeLength)[0]
         volFactor = vol / avgVol if avgVol != 0 else 1.0
 
+        # Current bar price + squared version
         c = self.close[0]
         o = self.open[0]
         c2 = c * c
         o2 = o * o
 
+        # Recursive envelope updates with persistent memory
         self.up1_htf[0] = max(c, o, self.up1_htf[1] - alpha * (self.up1_htf[1] - c)) if not isnan(self.up1_htf[1]) else c
         self.dn1_htf[0] = min(c, o, self.dn1_htf[1] + alpha * (c - self.dn1_htf[1])) if not isnan(self.dn1_htf[1]) else c
         self.up2_htf[0] = max(c2, o2, self.up2_htf[1] - alpha * (self.up2_htf[1] - c2)) if not isnan(self.up2_htf[1]) else c2
         self.dn2_htf[0] = min(c2, o2, self.dn2_htf[1] + alpha * (c2 - self.dn2_htf[1])) if not isnan(self.dn2_htf[1]) else c2
 
+        # Bull/Bear strength projection
         bull = sqrt(max(self.dn2_htf[0] - self.dn1_htf[0] * self.dn1_htf[0], 0)) * volFactor
         bear = sqrt(max(self.up2_htf[0] - self.up1_htf[0] * self.up1_htf[0], 0)) * volFactor
         return bull, bear
 
+# === MAIN INDICATOR ===
 @indicator("Enhanced Andean Oscillator 2025", overlay_main_pane=False)
 @param.int('length', default=25, min=1, title='Base Length')
 @param.int('signalLength', default=9, min=1, title='Signal Smoothing Length')
@@ -59,18 +92,23 @@ class AndeanHTFContext(SecContext):
 @plot.marker(title='Short Exit', color=color.RED, style=marker_style.CROSS, position=marker_position.BELOW, size=5)
 class Main(MainContext):
     def __init__(self, htf):
+        # Pull HTF signals from a full Andean calc
         self.bull_htf, self.bear_htf = self.calc_on(AndeanHTFContext, time_frame=htf)
 
+        # Initialize persistent state for envelope tracking
         self.up1 = self.new_mut_series_f(0.0)
         self.dn1 = self.new_mut_series_f(0.0)
         self.up2 = self.new_mut_series_f(0.0)
         self.dn2 = self.new_mut_series_f(0.0)
         self.bullSeries = self.new_mut_series_f(0.0)
         self.bearSeries = self.new_mut_series_f(0.0)
+
+        # Position state tracking
         self.inLong = self.new_mut_series_f(0.0)
         self.inShort = self.new_mut_series_f(0.0)
 
     def calc(self, length, signalLength, htf, deadZone, atrLength, volumeLength, slopeLookback):
+        # === Adaptive alpha calculation ===
         atr_series = Atr.new(atrLength)
         atr_now = atr_series[0]
         atr_ref = Sma.new(atr_series, atrLength)[0]
@@ -81,6 +119,7 @@ class Main(MainContext):
         avgVol = Sma.new(self.volume, volumeLength)[0]
         volFactor = vol / avgVol if avgVol != 0 else 1.0
 
+        # === Envelope updates ===
         c = self.close[0]
         o = self.open[0]
         c2 = c * c
@@ -91,33 +130,41 @@ class Main(MainContext):
         self.up2[0] = max(c2, o2, self.up2[1] - alpha * (self.up2[1] - c2)) if not isnan(self.up2[1]) else c2
         self.dn2[0] = min(c2, o2, self.dn2[1] + alpha * (c2 - self.dn2[1])) if not isnan(self.dn2[1]) else c2
 
+        # === Bull/Bear Strength Calculation ===
         bull = sqrt(max(self.dn2[0] - self.dn1[0] * self.dn1[0], 0)) * volFactor
         bear = sqrt(max(self.up2[0] - self.up1[0] * self.up1[0], 0)) * volFactor
-
         self.bullSeries[0] = bull
         self.bearSeries[0] = bear
 
+        # === Double-smoothed signal line ===
         signal1 = Ema.new(MutSeriesF.new(max(bull, bear)), signalLength)[0]
         signal = Ema.new(MutSeriesF.new(signal1), signalLength)[0]
 
+        # === Logic conditions ===
         diff = bull - bear
         inDeadZone = abs(diff) < deadZone
+
         slopeBull = bull - self.bullSeries[slopeLookback]
         slopeBear = bear - self.bearSeries[slopeLookback]
         validSlope = slopeBull > 0 and slopeBear < 0
+
         htf_ok = self.bull_htf[0] > self.bear_htf[0]
 
+        # === Trade signal logic ===
         longCond = bull > bear + deadZone and not inDeadZone and validSlope and htf_ok
         shortCond = bear > bull + deadZone and not inDeadZone and slopeBear > 0 and slopeBull < 0 and not htf_ok
 
+        # === Exit conditions ===
         exitLong = bull < signal
         exitShort = bear < signal
 
+        # === State tracking for entry/exit — used for exit marker display ===
         self.inLong[0] = 1.0 if longCond else (0.0 if exitLong and self.inLong[1] > 0 else self.inLong[1])
         self.inShort[0] = 1.0 if shortCond else (0.0 if exitShort and self.inShort[1] > 0 else self.inShort[1])
 
-        longEntryMarker = plot.Marker(bull, text="▲") if longCond else plot.Marker(nan)
-        shortEntryMarker = plot.Marker(bear, text="▼") if shortCond else plot.Marker(nan)
+        # === Visual markers ===
+        longEntryMarker = plot.Marker(bull, text="▲") if longCond else plot.Marker(nan) #▲▼ emoji dont work yet
+        shortEntryMarker = plot.Marker(bear, text="▼") if shortCond else plot.Marker(nan) #▲▼ emoji dont work yet
         longExitMarker = plot.Marker(bull) if self.inLong[1] > 0 and exitLong else plot.Marker(nan)
         shortExitMarker = plot.Marker(bear) if self.inShort[1] > 0 and exitShort else plot.Marker(nan)
 

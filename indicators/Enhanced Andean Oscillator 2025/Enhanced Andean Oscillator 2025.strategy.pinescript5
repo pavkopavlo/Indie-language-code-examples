@@ -1,3 +1,8 @@
+// Copyright (c) 2025 @pavelmedd https://takeprofit.com/@pavelmedd. All rights reserved.
+// This work is licensed under the MIT License.
+// For a copy, see <https://opensource.org/licenses/MIT>.
+// Inspired by Andean Oscillator created by Alex Pierrefeu - 100% reingenered to new indicator
+
 //@version=5
 strategy("Enhanced Andean Oscillator 2025 Strategy", overlay=false, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
 

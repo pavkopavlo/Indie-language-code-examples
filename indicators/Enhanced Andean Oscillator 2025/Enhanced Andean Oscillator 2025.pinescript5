@@ -1,3 +1,10 @@
+// Copyright (c) 2025 @pavelmedd https://takeprofit.com/@pavelmedd. All rights reserved.
+// This work is licensed under the MIT License.
+// For a copy, see <https://opensource.org/licenses/MIT>.
+// This indicator is inspired by Andean Oscillator created by Alex Pierrefeu - 100% reingenered to new indicator
+
+
+
 //@version=5
 indicator("Enhanced Andean Oscillator 2025", overlay=false)
 

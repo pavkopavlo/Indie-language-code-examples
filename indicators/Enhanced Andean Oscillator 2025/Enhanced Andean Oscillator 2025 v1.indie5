@@ -1,50 +1,51 @@
 # indie:lang_version = 5
 from math import sqrt, isnan, nan
 from indie import (
-    indicator, param, color, plot,
-    MainContext, MutSeriesF, TimeFrame, sec_context, param_ref
+    indicator, param, color, plot, SecContext,
+    MainContext, MutSeriesF, TimeFrame, param_ref
 )
 from indie.algorithms import Atr, Sma, Ema
 from indie.plot import marker_style, marker_position
 
-@sec_context
 @param_ref('length')
 @param_ref('atrLength')
 @param_ref('volumeLength')
-def AndeanHTF(self, length, atrLength, volumeLength):
-    atr_series = Atr.new(atrLength)
-    atr_now = atr_series[0]
-    atr_ref = Sma.new(atr_series, atrLength)[0]
-    alpha = 2 / (length + 1)
-    alpha = max(min(alpha * (atr_now / atr_ref), 1), 0.001)
+class AndeanHTFContext(SecContext):
+    def __init__(self):
+        self.up1_htf = self.new_mut_series_f(self.close[0])
+        self.dn1_htf = self.new_mut_series_f(self.close[0])
+        self.up2_htf = self.new_mut_series_f(self.close[0] ** 2)
+        self.dn2_htf = self.new_mut_series_f(self.close[0] ** 2)
 
-    vol = self.volume[0]
-    avgVol = Sma.new(self.volume, volumeLength)[0]
-    volFactor = vol / avgVol if avgVol != 0 else 1.0
+    def calc(self, length: int, atrLength: int, volumeLength: int) -> tuple[float, float]:
+        atr_series = Atr.new(atrLength)
+        atr_now = atr_series[0]
+        atr_ref = Sma.new(atr_series, atrLength)[0]
+        alpha = 2 / (length + 1)
+        alpha = max(min(alpha * (atr_now / atr_ref), 1), 0.001)
 
-    c = self.close[0]
-    o = self.open[0]
-    c2 = c * c
-    o2 = o * o
+        vol = self.volume[0]
+        avgVol = Sma.new(self.volume, volumeLength)[0]
+        volFactor = vol / avgVol if avgVol != 0 else 1.0
 
-    up1 = MutSeriesF.new(c)
-    dn1 = MutSeriesF.new(c)
-    up2 = MutSeriesF.new(c2)
-    dn2 = MutSeriesF.new(c2)
+        c = self.close[0]
+        o = self.open[0]
+        c2 = c * c
+        o2 = o * o
 
-    up1[0] = max(c, o, up1[1] - alpha * (up1[1] - c)) if not isnan(up1[1]) else c
-    dn1[0] = min(c, o, dn1[1] + alpha * (c - dn1[1])) if not isnan(dn1[1]) else c
-    up2[0] = max(c2, o2, up2[1] - alpha * (up2[1] - c2)) if not isnan(up2[1]) else c2
-    dn2[0] = min(c2, o2, dn2[1] + alpha * (c2 - dn2[1])) if not isnan(dn2[1]) else c2
+        self.up1_htf[0] = max(c, o, self.up1_htf[1] - alpha * (self.up1_htf[1] - c)) if not isnan(self.up1_htf[1]) else c
+        self.dn1_htf[0] = min(c, o, self.dn1_htf[1] + alpha * (c - self.dn1_htf[1])) if not isnan(self.dn1_htf[1]) else c
+        self.up2_htf[0] = max(c2, o2, self.up2_htf[1] - alpha * (self.up2_htf[1] - c2)) if not isnan(self.up2_htf[1]) else c2
+        self.dn2_htf[0] = min(c2, o2, self.dn2_htf[1] + alpha * (c2 - self.dn2_htf[1])) if not isnan(self.dn2_htf[1]) else c2
 
-    bull = sqrt(max(dn2[0] - dn1[0] * dn1[0], 0)) * volFactor
-    bear = sqrt(max(up2[0] - up1[0] * up1[0], 0)) * volFactor
-    return bull, bear
+        bull = sqrt(max(self.dn2_htf[0] - self.dn1_htf[0] * self.dn1_htf[0], 0)) * volFactor
+        bear = sqrt(max(self.up2_htf[0] - self.up1_htf[0] * self.up1_htf[0], 0)) * volFactor
+        return bull, bear
 
 @indicator("Enhanced Andean Oscillator 2025", overlay_main_pane=False)
 @param.int('length', default=25, min=1, title='Base Length')
 @param.int('signalLength', default=9, min=1, title='Signal Smoothing Length')
-@param.str('htf', default='60m', title='Higher Timeframe')
+@param.time_frame('htf', default='1h', title='Higher Timeframe')
 @param.float('deadZone', default=0.05, min=0.0, title='Dead Zone Threshold')
 @param.int('atrLength', default=14, min=1, title='ATR Length')
 @param.int('volumeLength', default=20, min=1, title='Volume Lookback')
@@ -56,21 +57,16 @@ def AndeanHTF(self, length, atrLength, volumeLength):
 @plot.marker(title='Short Entry', color=color.RED, style=marker_style.LABEL, position=marker_position.BELOW, size=5)
 @plot.marker(title='Long Exit', color=color.GREEN, style=marker_style.CROSS, position=marker_position.ABOVE, size=5)
 @plot.marker(title='Short Exit', color=color.RED, style=marker_style.CROSS, position=marker_position.BELOW, size=5)
-
 class Main(MainContext):
     def __init__(self, htf):
-        self.htf = TimeFrame.from_str(htf)
-        self.bull_htf, self.bear_htf = self.calc_on(AndeanHTF, time_frame=self.htf)
-        
-        # Use self.new_mut_series_f() in __init__ method
+        self.bull_htf, self.bear_htf = self.calc_on(AndeanHTFContext, time_frame=htf)
+
         self.up1 = self.new_mut_series_f(0.0)
         self.dn1 = self.new_mut_series_f(0.0)
         self.up2 = self.new_mut_series_f(0.0)
         self.dn2 = self.new_mut_series_f(0.0)
         self.bullSeries = self.new_mut_series_f(0.0)
         self.bearSeries = self.new_mut_series_f(0.0)
-        
-        # Отслеживание состояний позиций
         self.inLong = self.new_mut_series_f(0.0)
         self.inShort = self.new_mut_series_f(0.0)
 
@@ -104,31 +100,25 @@ class Main(MainContext):
         signal1 = Ema.new(MutSeriesF.new(max(bull, bear)), signalLength)[0]
         signal = Ema.new(MutSeriesF.new(signal1), signalLength)[0]
 
-        # Trading logic
         diff = bull - bear
         inDeadZone = abs(diff) < deadZone
-
         slopeBull = bull - self.bullSeries[slopeLookback]
         slopeBear = bear - self.bearSeries[slopeLookback]
         validSlope = slopeBull > 0 and slopeBear < 0
-
         htf_ok = self.bull_htf[0] > self.bear_htf[0]
 
         longCond = bull > bear + deadZone and not inDeadZone and validSlope and htf_ok
         shortCond = bear > bull + deadZone and not inDeadZone and slopeBear > 0 and slopeBull < 0 and not htf_ok
-        
-        # Вычисляем условия выхода из позиций
+
         exitLong = bull < signal
         exitShort = bear < signal
-        
-        # Отслеживаем состояние позиций
+
         self.inLong[0] = 1.0 if longCond else (0.0 if exitLong and self.inLong[1] > 0 else self.inLong[1])
         self.inShort[0] = 1.0 if shortCond else (0.0 if exitShort and self.inShort[1] > 0 else self.inShort[1])
 
-        # Создаем маркеры с текстовыми символами для сигналов
         longEntryMarker = plot.Marker(bull, text="▲") if longCond else plot.Marker(nan)
         shortEntryMarker = plot.Marker(bear, text="▼") if shortCond else plot.Marker(nan)
         longExitMarker = plot.Marker(bull) if self.inLong[1] > 0 and exitLong else plot.Marker(nan)
         shortExitMarker = plot.Marker(bear) if self.inShort[1] > 0 and exitShort else plot.Marker(nan)
-        
+
         return bull, bear, signal, longEntryMarker, shortEntryMarker, longExitMarker, shortExitMarker

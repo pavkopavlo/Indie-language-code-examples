@@ -1,10 +1,10 @@
-### **Enhanced Andean Oscillator 2025 — Smoothed Volatility Envelope Momentum**
+# **Enhanced Andean Oscillator 2025 — Smoothed Volatility Envelope Momentum**
 
 This **professional-grade momentum oscillator,** based on adaptive envelope tracking and volatility projection, is re-engineered from the original Andean Oscillator (by Alpaca Team), with advanced enhancements for 2025 markets.
 
 ***
 
-### 🔍 **What It Does**
+## 🔍 **What It Does**
 
 This indicator dynamically analyzes price momentum using two sets of **adaptive envelopes** and **volatility-weighted deviation calculations**. It detects bullish and bearish pressure by projecting variance through a nonlinear smoothing model. Entry and exit signals are filtered using:
 

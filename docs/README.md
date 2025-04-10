@@ -1265,6 +1265,281 @@ You can build custom session/time filters using full Python datetime logic.
 Indie exposes a **rich datetime object**, direct access to chart metadata (symbol and timeframe), and a flexible `bar_index`. Anything beyond this (like exchange ID, chart styling, or built-in session tags) must be manually recreated or is not supported yet.
  
 
- 
+ ---
+ ***
+
+#Indie Language Packages / Built-ins Cheat Sheet
+
+### **1\. Core Package \(`indie`)**
+
+#### **Decorators**
+
+| Decorator | Purpose | Example |
+| --------- | ------- | ------- |
+| `@indicator` | Main indicator function | `@indicator("RSI", False)` |
+| `@param.int` | Integer input parameter | `@param.int('length', 14)` |
+| `@param.source` | Price source selection | `@param.source('src', default=source.CLOSE)` |
+| `@band` | Horizontal band with fill | `@band(145, 155, line_color=color.RED)` |
+| `@level` | Horizontal line for levels | `@level(150, line_color=color.RED)` |
+| `@param.bool` | Boolean parameter input | `@param.bool('show_lines', default=True)` |
+| `@param.float` | Floating-point parameter input | `@param.float('threshold', default=0.5)` |
+| `@param.str` | String parameter input | `@param.str('option', default='A', options=['A'])` |
+| `@param.time_frame` | Timeframe input | `@param.time_frame('tf', default='1D')` |
+| `@param_ref` | Refers to param in `@sec_context` | `@param_ref('referenced_param')` |
+| `@sec_context` | Marks secondary context entrypoint | `@sec_context` |
+| `@algorithm` | Declares a custom series processor | `@algorithm` |
+
+#### **Context & Types**
+
+| Component | Description | Example |
+| --------- | ----------- | ------- |
+| `Context` | OHLCV access and instrument metadata | `self.close[0]` |
+| `MainContext` | Main chart instrument context | `class Main(MainContext):` |
+| `SecContext` | Additional instrument context | `def SecMain(self):` |
+| `SeriesF` | Immutable float series | `SeriesF.new(values)` |
+| `MutSeriesF` | Mutable float series | `MutSeriesF.new(init=0)` |
+| `Var[T]` | Revertible variable container | `Var.new(init_val)` |
+| `Optional[T]` | Optional wrapper (nullable type) | `Optional[str]("fallback")` |
+| `SymbolInfo` | Metadata about current instrument | `self.info.ticker` |
+| `TimeFrame` | Time granularity of instrument | `TimeFrame.from_str("1D")` |
+| `TradingSession` | Trading hours per instrument | `self.trading_session.is_regular(time)` |
+
+#### **Enums**
+
+| Enum | Values | Example |
+| ---- | ------ | ------- |
+| `format` | `INHERITED`, `PRICE`, `VOLUME` | `@indicator(format=format.PRICE)` |
+| `line_style` | `SOLID`, `DASHED`, `DOTTED` | `@level(100, line_style=line_style.DOTTED)` |
+| `source` | `OPEN`, `HIGH`, `LOW`, `CLOSE`, `HL2`, `HLC3`, `OHLC4` | `@param.source('src', default=source.HLC3)` |
+| `time_frame_unit` | `MINUTE`, `HOUR`, `DAY`, `WEEK`, `MONTH` | Used with `TimeFrame` |
+
+***
+
+### 2\. Package `indie.algorithms`
+
+| Algorithm | Function Signature & Return Type | Description |
+| --------- | -------------------------------- | ----------- |
+| `Adx` | `new(adx_len, di_len) -> (SeriesF, SeriesF, SeriesF)` | Minus DI, ADX, Plus DI |
+| `Atr` | `new(length, ma_algorithm='RMA') -> SeriesF` | Average True Range |
+| `Bb` | `new(src, length, mult) -> (SeriesF, SeriesF, SeriesF)` | Bollinger Bands |
+| `Cci` | `new(src, length) -> SeriesF` | Commodity Channel Index |
+| `Change` | `new(src, length=1) -> SeriesF` | Difference from `length` bars ago |
+| `Corr` | `new(x, y, length) -> SeriesF` | Correlation Coefficient |
+| `CumSum` | `new(src) -> SeriesF` | Cumulative Sum |
+| `Dev` | `new(src, length) -> SeriesF` | Mean Absolute Deviation |
+| `Donchian` | `new(length) -> SeriesF` | Middle line of Donchian Channel |
+| `Ema` | `new(src, length) -> SeriesF` | Exponential MA |
+| `FixNan` | `new(src) -> SeriesF` | Replace NaNs with last valid value |
+| `Highest` | `new(src, length) -> SeriesF` | Max over `length` |
+| `LinReg` | `new(src, length, offset=0) -> SeriesF` | Linear Regression Curve |
+| `Lowest` | `new(src, length) -> SeriesF` | Min over `length` |
+| `Ma` | `new(src, length, algorithm) -> SeriesF` | MA with algorithm: 'EMA', 'SMA', etc. |
+| `Macd` | `new(src, fast_len, slow_len, sig_len, ma_source='EMA', ma_signal='EMA') -> (SeriesF, SeriesF, SeriesF)` | MACD Line, Signal, Histogram |
+| `Median` | `new(src, length) -> SeriesF` | Moving Median |
+| `Mfi` | `new(src, length) -> SeriesF` | Money Flow Index |
+| `Mfv` | `new() -> SeriesF` | Money Flow Volume |
+| `NanToZero` | `new(src) -> SeriesF` | Replace NaNs with 0 |
+| `NetVolume` | `new(src) -> SeriesF` | Net Volume |
+| `PercentRank` | `new(src, length) -> SeriesF` | Percent Rank |
+| `Rma` | `new(src, length) -> SeriesF` | Smoothed MA for RSI |
+| `Roc` | `new(src, length) -> SeriesF` | Rate of Change |
+| `Rsi` | `new(src, length) -> SeriesF` | Relative Strength Index |
+| `Sar` | `new(start, increment, maximum) -> SeriesF` | Parabolic SAR |
+| `SinceHighest` | `new(src, length) -> Series[int]` | Bars since max in window |
+| `SinceLowest` | `new(src, length) -> Series[int]` | Bars since min in window |
+| `SinceTrue` | `new(condition) -> Series[int]` | Bars since last `True` |
+| `Sma` | `new(src, length) -> SeriesF` | Simple Moving Average |
+| `StdDev` | `new(src, length) -> SeriesF` | Standard Deviation |
+| `Stoch` | `new(src, low, high, length) -> SeriesF` | Stochastic Oscillator |
+| `Sum` | `new(src, length) -> SeriesF` | Sliding Sum |
+| `Supertrend` | `new(factor, atr_period, ma_algorithm) -> (SeriesF, SeriesF)` | Supertrend Line & Direction |
+| `Tr` | `new(handle_na=False) -> SeriesF` | True Range |
+| `Tsi` | `new(src, long_len, short_len) -> SeriesF` | True Strength Index |
+| `Uo` | `new(fast_len, middle_len, slow_len) -> SeriesF` | Ultimate Oscillator |
+| `Vwap` | `new(src, anchor, std_dev_mult) -> (SeriesF, SeriesF, SeriesF)` | VWAP + bands |
+| `Vwma` | `new(src, length) -> SeriesF` | Volume Weighted MA |
+| `Wma` | `new(src, length) -> SeriesF` | Weighted Moving Average |
+
+***
+
+### **3\. Visualization \(`indie.plot`)**
+
+#### **Plot Types**
+
+| Type | Decorator | Key Parameters | Example |
+| ---- | --------- | -------------- | ------- |
+| Line | `@plot.line` | `color`, `line_style`, `line_width`, `continuous` | `@plot.line(color=color.RED)` |
+| Histogram | `@plot.histogram` | `color`, `base_value`, `line_width` | `@plot.histogram(base_value=0)` |
+| Columns | `@plot.columns` | `color`, `base_value`, `rel_width` | `@plot.columns(color=color.YELLOW)` |
+| Marker | `@plot.marker` | `color`, `text`, `style`, `position`, `size` | `@plot.marker(style=marker_style.CIRCLE)` |
+| Fill | `@plot.fill` | `id1`, `id2`, `color` | `@plot.fill('plot1', 'plot2')` |
+| Steps | `@plot.steps` | `color`, `line_width` | `@plot.steps(line_width=2)` |
+
+#### **Styling Enums**
+
+| Enum | Options | Example |
+| ---- | ------- | ------- |
+| `line_style` | `SOLID`, `DASHED`, `DOTTED` | `line_style=DOTTED` |
+| `marker_style` | `NONE`, `CIRCLE`, `LABEL`, `CROSS` | `style=marker_style.CROSS` |
+| `marker_position` | `ABOVE`, `BELOW`, `LEFT`, `RIGHT`, `CENTER` | `position=marker_position.BELOW` |
+
+***
+
+### **4\. Colors \(`indie.color`)**
+
+| Method | Description | Example |
+| ------ | ----------- | ------- |
+| `rgba()` | Custom RGBA color | `rgba(255, 0, 0, 0.5)` |
+| Constants | Built-in named colors | `color.RED`, `color.GREEN(0.3)` |
+
+**Built-in Color Constants**:`AQUA`, `BLACK`, `BLUE`, `FUCHSIA`, `GRAY`, `GREEN`, `LIME`, `MAROON`, `NAVY`, `OLIVE`, `PURPLE`, `RED`, `SILVER`, `TEAL`, `WHITE`, `YELLOW`
+
+### **5\. Math \(`math`)**
+
+| Function | Purpose | Example |
+| -------- | ------- | ------- |
+| `cross()` | Detects any crossover (two series or series vs level) | `cross(self.close, self.open)` |
+| `cross_over()` | Detects upward crossover | `cross_over(self.close, 50)` |
+| `cross_under()` | Detects downward crossover | `cross_under(self.close, self.open)` |
+| `divide()` | Safe division with fallback | `divide(x, y, default=0.0)` |
+
+### **6\. Schedules \(`indie.schedule`)**
+
+| Component | Purpose | Example |
+| --------- | ------- | ------- |
+| `Schedule` | Manages active time rules and exceptions | `Schedule([rule], timezone="UTC")` |
+| `ScheduleRule` | Defines a rule with start/end times and days | `ScheduleRule(start=time(9), end=time(16), days=WORKDAYS)` |
+| `ALL_DAYS` | Mon–Sun list for `ScheduleRule` | `days=ALL_DAYS` |
+| `WORKDAYS` | Mon–Fri list for `ScheduleRule` | `days=WORKDAYS` |
+| `WEEKEND` | Sat–Sun list for `ScheduleRule` | `days=WEEKEND` |
+
+**Enum: `week_day`**`MONDAY`, `TUESDAY`, `WEDNESDAY`, `THURSDAY`, `FRIDAY`, `SATURDAY`, `SUNDAY`
+
+### **7\. Time \(`datetime`)**
+
+| Type | Purpose | Example |
+| ---- | ------- | ------- |
+| `datetime` | Full date & time object | `datetime(2024, 4, 10, 14, 30)` |
+| `time` | Time of day (no date) | `time(hour=9, minute=0)` |
+| `timedelta` | Duration / difference between datetimes | `timedelta(days=1, hours=5)` |
+
+**Key Methods**
+
+| Method | Description | Example |
+| ------ | ----------- | ------- |
+| `datetime.utcnowfromtimestamp()` | Convert timestamp to datetime | `datetime.utcfromtimestamp(ts)` |
+| `datetime.strptime()` | Parse datetime from string | `datetime.strptime("2025-04-10", "%Y-%m-%d")` |
+| `timedelta.total_seconds()` | Duration in seconds | `delta.total_seconds()` |
+
+### **8\. Statistics \(`statistics`)**
+
+| Function | Purpose | Example |
+| -------- | ------- | ------- |
+| `fmean()` | Mean of list of floats | `fmean([1.2, 2.3, 3.4])` |
+| `mean()` | Arithmetic mean (int or float) | `mean([1, 2, 3, 4])` |
+| `median()` | Median of data list | `median([3, 1, 4, 2])` |
+
+### **9\. Math \(`math`)**
+
+| Function | Description | Example |
+| -------- | ----------- | ------- |
+| `acos(x)` | Arc cosine | `acos(1.0)` |
+| `asin(x)` | Arc sine | `asin(0.5)` |
+| `atan(x)` | Arc tangent | `atan(1.0)` |
+| `ceil(x)` | Ceiling (round up) | `ceil(2.3)` |
+| `cos(x)` | Cosine | `cos(pi)` |
+| `exp(x)` | Exponential | `exp(2)` |
+| `exp2(x)` | 2 raised to power x | `exp2(3)` |
+| `floor(x)` | Floor (round down) | `floor(2.9)` |
+| `isclose(x, y)` | Check approximate equality | `isclose(1.0, 1.0000001)` |
+| `isnan(x)` | Check if value is NaN | `isnan(nan)` |
+| `log(x)` | Natural logarithm | `log(e)` |
+| `log10(x)` | Base-10 logarithm | `log10(100)` |
+| `log2(x)` | Base-2 logarithm | `log2(8)` |
+| `pow(x, y)` | Exponentiation | `pow(2, 3)` |
+| `sin(x)` | Sine | `sin(pi / 2)` |
+| `sqrt(x)` | Square root | `sqrt(9)` |
+| `tan(x)` | Tangent | `tan(pi / 4)` |
+
+**Constants**
+
+| Constant | Description |
+| -------- | ----------- |
+| `e` | Euler’s number |
+| `pi` | π (Pi) |
+| `nan` | Not-a-Number |
+
+### **10\. Built\-ins**
+
+#### **Constants**
+
+| Constant | Type | Description |
+| -------- | ---- | ----------- |
+| `True` | `bool` | Boolean true |
+| `False` | `bool` | Boolean false |
+| `None` | `NoneType` | Null value |
+
+***
+
+#### **Functions**
+
+| Function | Purpose | Example |
+| -------- | ------- | ------- |
+| `abs(x)` | Absolute value of int/float | `abs(-3.5)` → `3.5` |
+| `len(x)` | Length of a list/str/series | `len([1,2,3])` → `3` |
+| `max(x,y)` | Max of two or more values/list | `max(1, 3, 2)` → `3` |
+| `min(x,y)` | Min of two or more values/list | `min(5, 2, 8)` → `2` |
+| `range(...)` | Generate list of ints | `range(1, 5)` → `[1,2,3,4]` |
+| `round(x)` | Round float to nearest int or digit | `round(2.56)` → `3` |
+| `sum(l)` | Sum elements of a list | `sum([1, 2, 3])` → `6` |
+
+***
+
+#### **Types**
+
+| Type | Description |
+| ---- | ----------- |
+| `int` | Integer |
+| `float` | Floating point number |
+| `bool` | Boolean (`True` / `False`) |
+| `str` | String |
+| `list[T]` | List of type `T` |
+| `tuple[...]` | Tuple |
+| `dict[K,V]` | Dictionary with keys and values |
+| `NoneType` | Represents null (`None`) |
+
+***
+
+#### **String Methods**
+
+| Method | Description | Example |
+| ------ | ----------- | ------- |
+| `capitalize()` | Capitalizes first letter | `'abc'.capitalize()` → `'Abc'` |
+| `center(w, ch)` | Centers string in width `w` with `ch` | `'hi'.center(5, '-')` → `'-hi--'` |
+| `count(s)` | Count substring | `'ababa'.count('a')` → `3` |
+| `endswith(s)` | Check if ends with substring | `'test.py'.endswith('.py')` |
+| `find(s)` | First index of substring | `'hello'.find('l')` → `2` |
+| `index(s)` | First index (error if not found) | `'hello'.index('e')` → `1` |
+| `islower()` | Checks if all characters are lowercase | `'abc'.islower()` → `True` |
+| `isupper()` | Checks if all characters are uppercase | `'ABC'.isupper()` → `True` |
+| `isspace()` | Checks if only whitespace | `' '.isspace()` → `True` |
+| `join(lst)` | Join list into string | `','.join(['a','b'])` → `'a,b'` |
+| `ljust(w, ch)` | Left justify string | `'hi'.ljust(4,'-')` → `'hi--'` |
+| `lower()` | Convert to lowercase | `'ABC'.lower()` → `'abc'` |
+| `lstrip(chs)` | Strip leading characters | `'--abc'.lstrip('-')` → `'abc'` |
+| `partition(s)` | Split into 3 parts at first match | `'a=b'.partition('=')` |
+| `replace(o,n)` | Replace substrings | `'one two'.replace('one','1')` |
+| `rfind(s)` | Last index of substring | `'hello'.rfind('l')` → `3` |
+| `rindex(s)` | Last index (error if not found) | `'hello'.rindex('l')` |
+| `rjust(w, ch)` | Right justify | `'hi'.rjust(4,'-')` → `'--hi'` |
+| `rpartition(s)` | Split into 3 parts at last match | `'a=b=c'.rpartition('=')` |
+| `rsplit(sep)` | Right split | `'a,b,c'.rsplit(',', 1)` |
+| `rstrip(chs)` | Strip trailing characters | `'abc--'.rstrip('-')` → `'abc'` |
+| `split(sep)` | Split string by separator | `'a,b,c'.split(',')` |
+| `startswith(s)` | Check if starts with substring | `'abc'.startswith('a')` → `True` |
+| `strip(chs)` | Strip leading/trailing characters | `'--abc--'.strip('-')` → `'abc'` |
+| `swapcase()` | Swap upper/lowercase | `'AbC'.swapcase()` → `'aBc'` |
+| `upper()` | Convert to uppercase | `'abc'.upper()` → `'ABC'` |
+
 
  

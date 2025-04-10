@@ -1266,9 +1266,11 @@ Indie exposes a **rich datetime object**, direct access to chart metadata (symbo
  
 
  ---
+ ---
+ ---
  ***
 
-#Indie Language Packages / Built-ins Cheat Sheet
+# Indie Language Packages / Built-ins Cheat Sheet
 
 ### **1\. Core Package \(`indie`)**
 

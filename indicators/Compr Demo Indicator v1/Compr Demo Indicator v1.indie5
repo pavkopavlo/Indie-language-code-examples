@@ -1,0 +1,137 @@
+# indie:lang_version = 5
+# Comprehensive Indie Demo Indicator
+# This indicator demonstrates multiple Indie language features with full explanatory comments
+
+import math
+from indie import indicator, param, plot, color, level, band, MutSeriesF, Optional, MainContext, sec_context, line_style, TimeFrame
+from indie.algorithms import Sma, Ema, Rsi, Atr
+from indie.plot import marker_style, marker_position, Line, Marker, Histogram, Columns
+
+# Secondary context to compute values on a higher timeframe
+@sec_context
+def HigherTFContext(self):
+    # 14-period RSI and 50-period SMA on the higher timeframe
+    rsi = Rsi.new(self.close, 14)
+    sma = Sma.new(self.close, 50)
+    # If close is above the SMA, we consider it an uptrend (score 1.0), else 0.0
+    trend_score = 1.0 if self.close[0] > sma[0] else 0.0
+    return rsi[0], sma[0], trend_score
+
+# Main indicator class
+@indicator('Comprehensive Demo', overlay_main_pane=False)
+@param.int('fast_length', default=12, min=1, max=50, title='Fast Length')  # Fast EMA length
+@param.int('slow_length', default=26, min=1, max=100, title='Slow Length')  # Slow SMA length
+@param.float('volatility_mult', default=2.0, min=0.5, max=5.0, title='Volatility Multiplier')  # Volatility scaling factor
+@param.bool('show_higher_tf', default=True, title='Show Higher Timeframe')  # Toggle for showing higher timeframe marker
+@param.time_frame('higher_tf', default='1D', title='Higher Timeframe')  # Timeframe for higher timeframe analysis
+@plot.line(title='Main Line')  # Custom MACD-like line
+@plot.line(title='Signal Line')  # EMA of the main line
+@plot.histogram(title='Momentum')  # Difference between current and previous close
+@plot.marker(title='HTF Marker')  # Marker indicating higher timeframe trend
+@plot.marker(title='Crossover Marker')  # Buy/Sell crossover signal marker
+@plot.marker(title='Volatility Alert')  # Alert marker for high volatility
+@plot.columns(title='Volatility')  # Column plot for ATR-based volatility
+class Main(MainContext):
+
+    def __init__(self, higher_tf: TimeFrame):
+        # Default values for higher timeframe fallback
+        self.htf_rsi_val = 50.0
+        self.htf_sma_val = 0.0
+        self.htf_trend_val = 0.0
+
+        # Optional values for dynamic higher timeframe marker
+        self._htf_marker_value = Optional[float](None)
+        self._htf_marker_color = color.GRAY
+        self._htf_marker_text = Optional[str](None)
+
+        # Use higher timeframe only if different from current
+        if higher_tf != self.time_frame:
+            rsi_val, sma_val, trend_score = self.calc_on(HigherTFContext, time_frame=higher_tf)
+            self.htf_rsi_val = float(rsi_val[0])
+            self.htf_sma_val = float(sma_val[0])
+            self.htf_trend_val = float(trend_score[0])
+
+    def calc(self, fast_length, slow_length, volatility_mult, show_higher_tf, higher_tf):
+        # Calculate fast and slow moving averages
+        fast_ma = Ema.new(self.close, fast_length)
+        slow_ma = Sma.new(self.close, slow_length)
+        rsi = Rsi.new(self.close, 14)
+
+        # Crossover detection: bullish (cross up) or bearish (cross down)
+        cross_up = self.close[1] <= slow_ma[1] and self.close[0] > slow_ma[0]
+        cross_down = self.close[1] >= slow_ma[1] and self.close[0] < slow_ma[0]
+
+        crossover_val = math.nan
+        crossover_text: Optional[str] = Optional[str](None)
+        crossover_color = color.GRAY
+
+        crossover_detected = cross_up or cross_down
+        if crossover_detected:
+            crossover_val = 80.0 if cross_up else 20.0
+            direction = "+" if cross_up else "-"
+            arrow = "^" if cross_up else "v"
+            label = "BUY" if cross_up else "SELL"
+            crossover_color = color.LIME if cross_up else color.RED
+            crossover_text = Optional[str](arrow + " " + label + " " + direction)
+
+        # Momentum calculation: price difference between current and previous close
+        momentum_value = self.close[0] - self.close[1]
+        momentum_color = color.GREEN if momentum_value > 0 else color.RED
+
+        # ATR-based volatility: normalized as percentage of current close
+        atr = Atr.new(10)
+        volatility = atr[0] / self.close[0] * 100
+
+        # High volatility marker: appears on the price chart if volatility > 5%
+        vol_marker = Marker(math.nan)
+        if volatility > 5.0:
+            vol_marker = Marker(
+                self.close[0],
+                text="X High Vol!",
+                color=color.RED
+            )
+
+        # MACD-like line: difference between fast and slow MA
+        main_line = fast_ma[0] - slow_ma[0]
+        signal_series = MutSeriesF.new(main_line)
+        signal_line = Ema.new(signal_series, 9)[0]
+
+        # Convert stored values to series for plotting HTF markers
+        htf_rsi = MutSeriesF.new(self.htf_rsi_val)
+        htf_trend = MutSeriesF.new(self.htf_trend_val)
+
+        # HTF marker update every 50 bars to reduce clutter
+        if show_higher_tf and self.bar_index % 50 == 0:
+            marker_val = 80.0 if htf_trend[0] > 0 else 20.0
+            self._htf_marker_value = Optional[float](marker_val)
+            self._htf_marker_color = color.GREEN if htf_trend[0] > 0 else color.RED
+            rsi_val = htf_rsi[0]
+            rsi_str = "HTF RSI: " + str(int(round(rsi_val))) if not math.isnan(rsi_val) else "x"
+            self._htf_marker_text = Optional[str](rsi_str)
+        else:
+            self._htf_marker_value = Optional[float](None)
+            self._htf_marker_text = Optional[str](None)
+
+        htf_marker_val = self._htf_marker_value.value_or(math.nan)
+        htf_marker_text = self._htf_marker_text.value_or("") if self._htf_marker_text is not None else None
+
+        # Final output: all elements to render on chart
+        return (
+            Line(main_line),  # MACD-like signal
+            Line(signal_line),  # Smoothed signal line
+            Histogram(momentum_value, color=momentum_color),  # Price momentum
+            Marker(htf_marker_val, text=htf_marker_text, color=self._htf_marker_color)
+                if show_higher_tf and not math.isnan(htf_marker_val) else Marker(math.nan),
+            Marker(crossover_val, text=crossover_text.value_or("") if crossover_text is not None else None, color=crossover_color)
+                if crossover_detected else Marker(math.nan),
+            vol_marker,  # Volatility alert
+            Columns(
+                volatility * volatility_mult,  # Volatility column
+                color=color.rgba(
+                    255 if volatility > 2 else 100,
+                    100,
+                    255 if volatility <= 2 else 100,
+                    0.5
+                )
+            )
+        )
